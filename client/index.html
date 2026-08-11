@@ -615,118 +615,35 @@ function renderTabContent(data) {
         <div class="lat-chip"><strong>Model Identifier:</strong> ${escapeHtml(data.model_key || 'llama3-70b-instruct')}</div>
       </div>
 
-      ${data.observability?.langsmith_report ? `
       <div class="sp-section" style="padding-bottom:12px;">
-        <div class="sp-section-title" style="color:var(--indigo);">🛠️ LangSmith System Telemetry Trace</div>
-        <div style="font-size:12px; background:rgba(79,70,229,0.06); border:1px solid rgba(79,70,229,0.2); padding:12px; border-radius:8px; color:var(--gray); display:flex; flex-direction:column; gap:4px;">
-          <div><strong>Active Project Container:</strong> ${escapeHtml(data.observability.langsmith_report.project)}</div>
-          <div><strong>Unique Trace ID Identifier:</strong> ${escapeHtml(data.observability.langsmith_report.run_id)}</div>
-          <div><strong>Trace Step Depth Status:</strong> ${escapeHtml(data.observability.langsmith_report.trace_depth)}</div>
-        </div>
-      </div>` : ''}
-
-      <div class="sp-section" style="padding-bottom:12px;">
-        <div class="sp-section-title" style="color:var(--teal);">📈 Ragas &amp; DeepEval Realtime Matrix</div>
+        <div class="sp-section-title" style="color:var(--teal);">📈 Core Quality Metrics</div>
         ${realEvalStatusHtml}
         <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; font-size:12px; margin-bottom:12px;">
           <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
             <div style="color:var(--mint); font-weight:700; margin-bottom:4px;">RAGAS Faithfulness</div>
             <div style="font-size:18px; font-weight:800; color:var(--mint);">${ragasFaithfulnessPct}%</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:2px;">Answer vs. Context — is the answer grounded in the retrieved chunks?</div>
           </div>
           <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
-            <div style="color:var(--teal); font-weight:700; margin-bottom:4px;">RAGAS Relevance</div>
+            <div style="color:var(--teal); font-weight:700; margin-bottom:4px;">RAGAS Answer Relevance</div>
             <div style="font-size:18px; font-weight:800; color:var(--teal);">${ragasRelevancePct}%</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:2px;">Answer vs. Query — did it resolve what was actually asked?</div>
+          </div>
+          <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
+            <div style="color:var(--amber); font-weight:700; margin-bottom:4px;">DeepEval Context Recall</div>
+            <div style="font-size:18px; font-weight:800; color:var(--amber);">${Math.round((data.observability?.ragas?.context_recall || 0)*100)}%</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:2px;">Context vs. Source PDF — approximate local proxy, not a ground-truth-verified recall score</div>
+          </div>
+          <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
+            <div style="color:var(--coral); font-weight:700; margin-bottom:4px;">DeepEval Hallucination Index</div>
+            <div style="font-size:18px; font-weight:800; color:var(--coral);">${deepevalHallucinationPct}%</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:2px;">Answer vs. Context (inverse) — % of sentences that contradict or fabricate</div>
           </div>
         </div>
         <button class="sbar-detail-toggle" onclick="toggleEvidenceContainer(this)">▶ Show RAGAS Clarity &amp; Evidence Trace</button>
         <div class="sbar-extra" style="white-space: pre-wrap; font-family: sans-serif; font-size: 12px; padding:14px; background:rgba(2,195,154,0.03); border:1px dashed rgba(2,195,154,0.2); line-height:1.6; color:var(--gray);">${escapeHtml(ragasEvidenceText)}</div>
-
-        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; font-size:12px; margin-top:14px; margin-bottom:12px;">
-          <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
-            <div style="color:var(--amber); font-weight:700; margin-bottom:4px;">DeepEval Recall</div>
-            <div style="font-size:18px; font-weight:800; color:var(--amber);">${Math.round((data.observability?.ragas?.context_recall || 0)*100)}%</div>
-          </div>
-          <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
-            <div style="color:var(--coral); font-weight:700; margin-bottom:4px;">DeepEval Hallucination</div>
-            <div style="font-size:18px; font-weight:800; color:var(--coral);">${deepevalHallucinationPct}%</div>
-          </div>
-        </div>
         <button class="sbar-detail-toggle" onclick="toggleEvidenceContainer(this)">▶ Show DeepEval Clarity &amp; Evidence Trace</button>
         <div class="sbar-extra" style="white-space: pre-wrap; font-family: sans-serif; font-size: 12px; padding:14px; background:rgba(244,162,97,0.03); border:1px dashed rgba(244,162,97,0.2); line-height:1.6; color:var(--gray);">${escapeHtml(deepevalEvidenceText)}</div>
-
-        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; font-size:12px; margin-top:14px; margin-bottom:12px;">
-          <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
-            <div style="color:var(--indigo); font-weight:700; margin-bottom:4px;">RAGAS Context Precision</div>
-            <div style="font-size:18px; font-weight:800; color:var(--indigo);">${ragasContextPrecisionPct != null ? ragasContextPrecisionPct + '%' : '—'}</div>
-            <div style="font-size:10px; color:var(--muted); margin-top:2px;">Were retrieved chunks actually useful? (reference-free)</div>
-          </div>
-          <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
-            <div style="color:var(--indigo); font-weight:700; margin-bottom:4px;">DeepEval Contextual Relevancy</div>
-            <div style="font-size:18px; font-weight:800; color:var(--indigo);">${deepevalContextualRelevancyPct != null ? deepevalContextualRelevancyPct + '%' : '—'}</div>
-            <div style="font-size:10px; color:var(--muted); margin-top:2px;">Were retrieved chunks relevant to the question? (reference-free)</div>
-          </div>
-        </div>
-        <div style="font-size:10.5px; color:var(--muted); margin-top:-4px;">These measure the retrieval step, not the generation step — a real Context Recall metric needs a labeled ground-truth eval set and isn't shown here yet.</div>
-      </div>
-
-      ${(() => {
-        const cmp = realEval?.providers_compared;
-        if (!cmp) return '';
-        const row = (label, path) => {
-          const ollamaVal = cmp.ollama?.[path[0]]?.[path[1]];
-          const claudeVal = cmp.claude?.[path[0]]?.[path[1]];
-          const ollamaErr = cmp.ollama?.[`${path[0]}_error`];
-          const claudeErr = cmp.claude?.[`${path[0]}_error`];
-          const fmt = (v, err) => err ? `<span style="color:var(--coral); font-size:10.5px;">error</span>`
-            : (v == null ? '—' : Math.round(v * 100) + '%');
-          return `<tr>
-            <td style="padding:6px 8px; color:var(--muted);">${label}</td>
-            <td style="padding:6px 8px; text-align:center; font-weight:700;">${fmt(ollamaVal, ollamaErr)}</td>
-            <td style="padding:6px 8px; text-align:center; font-weight:700;">${fmt(claudeVal, claudeErr)}</td>
-          </tr>`;
-        };
-        return `
-        <div class="sp-section" style="padding-bottom:12px;">
-          <div class="sp-section-title" style="color:var(--amber);">⚖️ Judge Comparison: Llama 3.1 (free/local) vs Claude</div>
-          <div style="font-size:11px; color:var(--muted); margin-bottom:8px;">Same (question, answer, context) scored by both judges independently — use this to see where the free local model and Claude disagree.</div>
-          <table style="width:100%; font-size:12px; border-collapse:collapse;">
-            <thead>
-              <tr style="border-bottom:1px solid var(--border-color);">
-                <th style="text-align:left; padding:6px 8px; color:var(--muted); font-weight:600;">Metric</th>
-                <th style="padding:6px 8px; color:var(--mint);">Llama 3.1</th>
-                <th style="padding:6px 8px; color:var(--indigo);">Claude</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${row('RAGAS Faithfulness', ['ragas', 'faithfulness'])}
-              ${row('RAGAS Answer Relevancy', ['ragas', 'answer_relevancy'])}
-              ${row('RAGAS Context Precision', ['ragas', 'context_precision'])}
-              ${row('DeepEval Faithfulness', ['deepeval', 'faithfulness'])}
-              ${row('DeepEval Hallucination', ['deepeval', 'hallucination'])}
-              ${row('DeepEval Contextual Relevancy', ['deepeval', 'contextual_relevancy'])}
-            </tbody>
-          </table>
-          ${cmp.claude?.ragas_error || cmp.claude?.deepeval_error ? `<div style="font-size:10.5px; color:var(--coral); margin-top:8px;">Claude side error: ${escapeHtml(cmp.claude.ragas_error || cmp.claude.deepeval_error)}</div>` : ''}
-        </div>`;
-      })()}
-
-      <div class="sp-section">
-        <div class="sp-section-title">Scorer Breakdown - Formula + Evidence</div>
-
-        <div class="sbar">
-          <div class="sbar-header"><span class="sbar-name">NeuroSymbolic</span><span class="sbar-pct">${Math.round((data.scorers?.neurosymbolic || 0)*100)}%</span></div>
-          <div class="sbar-track"><div class="sbar-fill" style="width: ${(data.scorers?.neurosymbolic || 0)*100}%; background: var(--amber);"></div></div>
-          <div class="sbar-formula">confidence = symbolic_score * 0.6 + neural_score * 0.4</div>
-          <button class="sbar-detail-toggle" onclick="toggleEvidenceContainer(this)">▶ Show evidence</button>
-          <div class="sbar-extra">6 symbolic rules (temporal/numerical/entity/logical-form/causal/quantifier consistency) combined with embedding-based neural plausibility against the retrieved context.</div>
-        </div>
-      </div>
-
-      <div class="sp-section">
-        <div class="sp-section-title">Telemetry Interpretation</div>
-        <div style="font-size:13px; color:var(--muted); line-height:1.6; background:rgba(0,0,0,0.1); padding:12px; border-radius:8px;">
-          ${escapeHtml(data.interpretation)}
-        </div>
       </div>`;
   } else if (activePanelTab === 'playarea') {
     const params = data.search_parameters || {};
