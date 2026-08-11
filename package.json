@@ -1,0 +1,27 @@
+{
+  "name": "hm-chatbot",
+  "version": "1.0.0",
+  "description": "Chatbot powered by Together AI with Hallucination Manager guardrails",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.2.1",
+    "@xenova/transformers": "^2.17.2",
+    "axios": "^1.18.1",
+    "chromadb": "^3.5.0",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.2",
+    "langchain": "^1.5.2",
+    "multer": "^2.2.0",
+    "sharp": "^0.35.3",
+    "unpdf": "^1.6.2"
+  },
+  "allowScripts": {
+    "protobufjs@6.11.6": true,
+    "sharp@0.32.6": true
+  }
+}

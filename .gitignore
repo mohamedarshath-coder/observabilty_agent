@@ -1,0 +1,7 @@
+node_modules/
+venv/
+.env
+Sentance_Transformer/
+.deepeval/
+chroma_data/
+*.log
