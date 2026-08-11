@@ -43,6 +43,12 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY;
 
+// Disabled per explicit request — was flagging real dollar amounts and person names as
+// [REDACTED ...] before showing an answer. Kept as a flag (not deleted) so it's a one-line
+// flip back to re-enable, instead of having to re-implement the masking logic below.
+// Set MASKING_ENABLED=true in .env to turn redaction back on.
+const MASKING_ENABLED = process.env.MASKING_ENABLED === 'true';
+
 // Real ragas/deepeval run in a separate Python microservice (see eval_service/) since
 // both libraries are Python-only. Scored asynchronously — the chat response returns
 // immediately, and the client polls /api/real-eval/:id for the real scores once ready.
@@ -448,8 +454,23 @@ async function runRealEvalAsync(evalId, { question, answer, context, maskedAnswe
   setTimeout(() => realEvalStore.delete(evalId), REAL_EVAL_TTL_MS);
 }
 
+// Shared refusal detector — retrieval always returns *some* chunks even when none are
+// actually relevant (nearest-neighbor search doesn't return empty just because the best
+// match is a poor one), so "context is non-empty" alone can't distinguish a real answer
+// from a refusal grounded in irrelevant context. Confirmed live: the model phrases a "no
+// answer found" refusal several different ways ("does not contain", "There is no
+// information...", "I am sorry..."), and the citation footer used to only recognize 2 of
+// them, wrongly attaching an unrelated source list to refusals worded any other way.
+// Deliberately does NOT match softer caveats like "not explicitly stated" — those show up
+// on legitimate partial answers that DID use the context (e.g. "total fee is not
+// explicitly stated, but the subtotal is $X") and should keep their real sources.
+function isRefusalText(text) {
+  const lower = (text || '').toLowerCase();
+  return /\b(does not contain|no information|no mention|not covered|cannot find|no relevant|no data|i am sorry|i'm sorry)\b/.test(lower);
+}
+
 async function compileObservabilityTelemetry(query, response, context) {
-  const isRefusal = response.toLowerCase().includes("does not contain") || response.toLowerCase().includes("sorry") || response.toLowerCase().includes("issuer certificate");
+  const isRefusal = isRefusalText(response);
 
   const contextLower = context.toLowerCase();
   const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
@@ -726,6 +747,7 @@ app.post('/api/chat', async (req, res) => {
   const rawLlmResponse = llmResponse;
 
   if (!networkBlocked) {
+   if (MASKING_ENABLED) {
     // ── 🛡️ MASKING GUARDRAIL 1: FINANCIAL REDACTION LAYER ──
     const financialCostMaskRegex = /(\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\b\d{1,3}(?:,\d{3})*(?:\.\d{2})?\s*(?:dollars|USD|fee|revenue|cost|payment)\b)/gi;
     llmResponse = llmResponse.replace(financialCostMaskRegex, "[REDACTED COST/REVENUE Metric]");
@@ -793,10 +815,10 @@ app.post('/api/chat', async (req, res) => {
       if (singleTokens.length >= 3) return matchedName;
       return (isCorporateEntity || isKnownLocation) ? matchedName : "[REDACTED PII / NAME Block]";
     });
+   }
 
     // ── 📚 CITATION FOOTER: append the exact source filenames once, after the full answer ──
-    const isRefusalResponse = llmResponse.toLowerCase().includes("does not contain") || llmResponse.toLowerCase().includes("sorry");
-    if (context.trim() && !isRefusalResponse) {
+    if (context.trim() && !isRefusalText(llmResponse)) {
       const sourceFileList = extractSourceFilenames(context);
       llmResponse += `\n\n---\n📚 **Sources:**\n${sourceFileList.map(name => `• ${name}`).join('\n')}`;
     }
