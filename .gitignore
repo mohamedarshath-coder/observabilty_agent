@@ -5,3 +5,4 @@ Sentance_Transformer/
 .deepeval/
 chroma_data/
 *.log
+__pycache__/
