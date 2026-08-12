@@ -274,7 +274,6 @@ def _build_deepeval_model(provider: str):
 def run_deepeval(question: str, answer: str, contexts: list, provider: str = "ollama"):
     from deepeval.metrics import (
         FaithfulnessMetric,
-        HallucinationMetric,
         ContextualRelevancyMetric,
     )
     from deepeval.test_case import LLMTestCase
@@ -292,7 +291,6 @@ def run_deepeval(question: str, answer: str, contexts: list, provider: str = "ol
     )
 
     faithfulness_metric = FaithfulnessMetric(**metric_kwargs)
-    hallucination_metric = HallucinationMetric(**metric_kwargs)
     # Reference-free — judges whether the retrieved chunks are relevant to the
     # question, no ground-truth expected_output required (unlike ContextualPrecision/
     # ContextualRecallMetric, which do require one and aren't usable without a
@@ -300,14 +298,26 @@ def run_deepeval(question: str, answer: str, contexts: list, provider: str = "ol
     relevancy_metric = ContextualRelevancyMetric(**metric_kwargs)
 
     faithfulness_metric.measure(test_case)
-    hallucination_metric.measure(test_case)
     relevancy_metric.measure(test_case)
+
+    # Hallucination is DERIVED from Faithfulness (1 - faithfulness) rather than measured
+    # via deepeval's own HallucinationMetric — confirmed live, twice, that HallucinationMetric
+    # gives unreliable results in this RAG setup: it treats the whole context as a single
+    # reference and checks whether the whole answer stays consistent with it, rather than
+    # extracting and verifying individual claims the way FaithfulnessMetric does. This
+    # produced contradictory results against manually-verified ground truth on both a
+    # refusal (scored 100% hallucination on a claim-free non-answer) and a legitimate,
+    # fully-accurate multi-item list (scored 48% hallucination on an answer verified
+    # correct). FaithfulnessMetric was accurate in every test run today, so its inverse is
+    # a more trustworthy Hallucination signal than deepeval's own dedicated metric for this
+    # answer shape — at the cost of no longer being a genuinely independent second check.
+    hallucination_score = round(1 - faithfulness_metric.score, 4)
 
     return {
         "faithfulness": faithfulness_metric.score,
         "faithfulness_reason": faithfulness_metric.reason,
-        "hallucination": hallucination_metric.score,
-        "hallucination_reason": hallucination_metric.reason,
+        "hallucination": hallucination_score,
+        "hallucination_reason": f"Derived as (1 - Faithfulness) rather than measured independently — see code comment for why. Faithfulness reason: {faithfulness_metric.reason}",
         "contextual_relevancy": relevancy_metric.score,
         "contextual_relevancy_reason": relevancy_metric.reason,
     }
