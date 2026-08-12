@@ -195,7 +195,8 @@ async function runSingleNliWindow(premiseWindow, hypothesis) {
   });
   const { logits } = await nliPipeline.model(modelInputs);
   const probs = softmaxArray(Array.from(logits.data));
-  const id2label = nliPipeline.model.config.id2label;
+  const id2lab
+  el = nliPipeline.model.config.id2label;
 
   const scores = { entailment: 0, neutral: 0, contradiction: 0 };
   probs.forEach((p, i) => {
