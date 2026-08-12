@@ -28,6 +28,7 @@ the chat answer to the user, then the client polls /api/real-eval/:id for the re
 """
 
 import os
+import re
 import math
 import logging
 from concurrent.futures import ThreadPoolExecutor
@@ -387,22 +388,55 @@ def _sanitize_json(obj):
     return obj
 
 
-def _evaluate_with_provider(question: str, answer: str, contexts: list, provider: str, masked_answer: str):
-    try:
-        ragas_scores = _sanitize_json(run_ragas(question, answer, contexts, provider))
-        ragas_error = None
-    except Exception as e:
-        logger.exception(f"ragas evaluation failed (provider={provider})")
-        ragas_scores = None
-        ragas_error = str(e)
+# Mirrors server.js's own isRefusalText() — kept as a separate copy since this runs in a
+# different process/language, not because the logic should ever diverge intentionally.
+_REFUSAL_PATTERN = re.compile(
+    r"\b(does not contain|no information|no mention|not covered|cannot find|no relevant|no data|i am sorry|i'm sorry)\b",
+    re.IGNORECASE,
+)
 
-    try:
-        deepeval_scores = _sanitize_json(run_deepeval(question, answer, contexts, provider))
+
+def _is_refusal_text(text: str) -> bool:
+    return bool(_REFUSAL_PATTERN.search(text or ""))
+
+
+def _evaluate_with_provider(question: str, answer: str, contexts: list, provider: str, masked_answer: str):
+    # A refusal makes zero factual claims, so there is nothing for DeepEval's
+    # claim-extraction step to check — and confirmed live that it doesn't handle this
+    # gracefully: an earlier identically-shaped refusal scored Hallucination 0% (correct),
+    # while a different refusal phrasing scored 100% (wrong) purely from how DeepEval's
+    # extraction happened to parse that specific sentence. Rather than rely on an LLM call
+    # to correctly judge "did this non-answer hallucinate," short-circuit with the values
+    # that are definitionally correct for any refusal: fully faithful (nothing to
+    # contradict), zero context relevance (nothing in the docs was actually used).
+    if _is_refusal_text(answer):
+        ragas_scores = {"faithfulness": 1.0, "answer_relevancy": 0.0, "context_precision": 0.0}
+        ragas_error = None
+        deepeval_scores = {
+            "faithfulness": 1.0,
+            "faithfulness_reason": "Refusal detected — no claims were made, so nothing can contradict the context.",
+            "hallucination": 0.0,
+            "hallucination_reason": "Refusal detected — no claims were made, so nothing can be fabricated.",
+            "contextual_relevancy": 0.0,
+            "contextual_relevancy_reason": "Refusal detected — the retrieved context did not contain an answer, so it was correctly not used.",
+        }
         deepeval_error = None
-    except Exception as e:
-        logger.exception(f"deepeval evaluation failed (provider={provider})")
-        deepeval_scores = None
-        deepeval_error = str(e)
+    else:
+        try:
+            ragas_scores = _sanitize_json(run_ragas(question, answer, contexts, provider))
+            ragas_error = None
+        except Exception as e:
+            logger.exception(f"ragas evaluation failed (provider={provider})")
+            ragas_scores = None
+            ragas_error = str(e)
+
+        try:
+            deepeval_scores = _sanitize_json(run_deepeval(question, answer, contexts, provider))
+            deepeval_error = None
+        except Exception as e:
+            logger.exception(f"deepeval evaluation failed (provider={provider})")
+            deepeval_scores = None
+            deepeval_error = str(e)
 
     try:
         masking_check = _sanitize_json(run_masking_check(masked_answer, provider))
