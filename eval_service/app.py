@@ -466,9 +466,33 @@ def _evaluate_with_provider(question: str, answer: str, contexts: list, provider
     }
 
 
+def _split_context_into_chunks(context: str) -> list:
+    """Reconstructs the individual retrieved chunks from server.js's merged context
+    string. server.js joins chunks as "[Source: <file> (Rerank: <score>)]:\\n<text>"
+    separated by blank lines — splitting back on that same "[Source:" boundary recovers
+    the original per-chunk list, generically for any document/question, no hardcoding.
+
+    Why this matters: passing one single pre-merged blob (as a 1-item list) to RAGAS's
+    Context Precision metric defeats its purpose — that metric is designed to judge and
+    rank multiple separately-retrieved items, so with only one blob to work with it can
+    only ask "is this collectively useful," which tends to score high whenever *any* part
+    of it helps, regardless of how much irrelevant padding surrounds that part. Confirmed
+    live: this metric sat near 100% on every test today, including ones where a large
+    fraction of the retrieved content was demonstrably irrelevant (DeepEval's own
+    Contextual Relevancy — which evaluates the same merged blob but splits it internally —
+    scored as low as 33% on one of those same cases). Splitting into real per-chunk items
+    here gives Context Precision what it actually needs to discriminate.
+    """
+    if not context or not context.strip():
+        return ["(no context retrieved)"]
+    parts = re.split(r'(?=\[Source:)', context)
+    parts = [p.strip() for p in parts if p.strip()]
+    return parts if parts else [context]
+
+
 @app.post("/evaluate")
 def evaluate_turn(req: EvalRequest):
-    contexts = [req.context] if req.context.strip() else ["(no context retrieved)"]
+    contexts = _split_context_into_chunks(req.context)
     masked_answer = req.masked_answer.strip() or req.answer
 
     providers = [p for p in req.providers if p in SUPPORTED_PROVIDERS] or ["ollama"]
