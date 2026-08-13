@@ -1,9 +1,18 @@
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
-ragas>=0.2.0
+# ragas>=0.3 still hard-imports langchain_community.chat_models.vertexai, which
+# langchain-community removed in 0.4.x — pin to the 0.2.x line that matches
+# langchain-community<0.4's legacy langchain-core<0.4 requirement.
+ragas==0.2.15
 deepeval>=1.4.0
 datasets>=2.19.0
-langchain-community>=0.2.0
-langchain-ollama>=0.1.0
-langchain-anthropic>=0.2.0
+langchain-community>=0.3.19,<0.4
+langchain-core<0.4
+langchain-ollama<0.3
+langchain-anthropic<0.4
 python-dotenv>=1.0.0
+# Local (offline) embeddings for ragas AnswerRelevancy — reuses the Sentance_Transformer
+# model already in the repo instead of Ollama, whose model registry is blocked by this
+# org's Zscaler proxy for large binary downloads. See local_embeddings.py.
+onnxruntime>=1.20.0
+tokenizers>=0.20.0

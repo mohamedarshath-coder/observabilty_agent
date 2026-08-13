@@ -1,11 +1,13 @@
 /**
  * LLM-as-a-Judge Scorer — real multi-provider ensemble
  *
- * Dispatches the SAME evaluation question to 3 independent LLMs across
+ * Dispatches the SAME evaluation question to 2 independent LLMs across
  * different providers, in parallel:
- *   Judge 1 — OpenAI      (env OPENAI_API_KEY,   model env OPENAI_JUDGE_MODEL,   default "gpt-4o-mini")
- *   Judge 2 — Anthropic   (env ANTHROPIC_API_KEY, model env ANTHROPIC_JUDGE_MODEL, default "claude-sonnet-5")
- *   Judge 3 — Together AI (env TOGETHER_API_KEY,  model env TOGETHER_JUDGE_MODEL,  default "meta-llama/Llama-3.3-70B-Instruct-Turbo" — same model as chat generation, guaranteed available on the account)
+ *   Judge 1 — Anthropic   (env ANTHROPIC_API_KEY, model env ANTHROPIC_JUDGE_MODEL, default "claude-sonnet-5")
+ *   Judge 2 — Together AI (env TOGETHER_API_KEY,  model env TOGETHER_JUDGE_MODEL,  default "meta-llama/Llama-3.3-70B-Instruct-Turbo" — same model as chat generation, guaranteed available on the account)
+ *
+ * OpenAI was intentionally dropped from this ensemble per project decision — only
+ * Anthropic and Together are used as judges now.
  *
  * Each judge is asked to return a strict JSON verdict: correct / partial / incorrect,
  * mapped to a 1.0 / 0.5 / 0.0 vote. Final confidence = mean of available judge votes.
@@ -60,27 +62,6 @@ function parseJudgeVerdict(rawText, provider, model) {
   };
 }
 
-async function callOpenAiJudge(promptArgs) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  const model = process.env.OPENAI_JUDGE_MODEL || 'gpt-4o-mini';
-  try {
-    const r = await axios.post('https://api.openai.com/v1/chat/completions', {
-      model,
-      messages: [
-        { role: 'system', content: JUDGE_SYSTEM_PROMPT },
-        { role: 'user', content: buildJudgeUserPrompt(promptArgs) },
-      ],
-      temperature: 0,
-      max_tokens: 200,
-    }, { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 20000, httpsAgent });
-    return parseJudgeVerdict(r.data.choices?.[0]?.message?.content || '', 'OpenAI', model);
-  } catch (err) {
-    console.error('[LLM Judge — OpenAI Error]:', err.response?.data?.error?.message || err.message);
-    return null;
-  }
-}
-
 async function callAnthropicJudge(promptArgs) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
@@ -93,7 +74,7 @@ async function callAnthropicJudge(promptArgs) {
       messages: [{ role: 'user', content: buildJudgeUserPrompt(promptArgs) }],
     }, {
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      timeout: 20000, httpsAgent,
+      timeout: 60000, httpsAgent,
     });
     const text = (r.data.content || []).map(c => c.text || '').join('');
     return parseJudgeVerdict(text, 'Anthropic', model);
@@ -120,7 +101,7 @@ async function callTogetherJudge(promptArgs) {
       ],
       temperature: 0,
       max_tokens: 200,
-    }, { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 20000, httpsAgent });
+    }, { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 60000, httpsAgent });
     return parseJudgeVerdict(r.data.choices?.[0]?.message?.content || '', 'Together', model);
   } catch (err) {
     console.error('[LLM Judge — Together Error]:', err.response?.data?.error?.message || err.message);
@@ -133,7 +114,6 @@ async function runLLMJudge({ response, context = '', question = '' }) {
   const promptArgs = { question, context, response };
 
   const settled = await Promise.all([
-    callOpenAiJudge(promptArgs),
     callAnthropicJudge(promptArgs),
     callTogetherJudge(promptArgs),
   ]);

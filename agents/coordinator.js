@@ -9,7 +9,7 @@
  *   2. Responsible AI Policy  — policy rule checks (rule-based by design)
  *   3. Black Box Scorer       — real independent LLM resample + embedding cosine similarity
  *   4. White Box Scorer       — real per-token logprobs from the generating LLM call
- *   5. LLM-as-a-Judge         — real 3-judge cross-provider ensemble (OpenAI + Anthropic + Together)
+ *   5. LLM-as-a-Judge         — real 2-judge cross-provider ensemble (Anthropic + Together)
  *   6. Groundedness Scorer    — real NLI entailment per sentence + embedding-based context relevance
  *   7. NeuroSymbolic Scorer   — symbolic rules (rule-based by design) + real embedding cosine similarity
  *

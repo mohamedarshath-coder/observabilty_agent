@@ -4,8 +4,14 @@ HM Chatbot — Real Evaluation Microservice
 Wraps the ACTUAL `ragas` and `deepeval` Python libraries (there is no mature JS port,
 so this runs as a separate process the Node backend calls over HTTP). Both libraries
 need an LLM internally to decompose answers into claims and verify each one against
-the retrieved context — that's what produces the scores. Configured here to use a
-locally running Ollama model instead of a paid API, per project decision.
+the retrieved context — that's what produces the scores. Supports a locally running
+Ollama model as an alternative to a paid API judge, per the original project decision,
+but the judge LLM actually in use (server.js requests provider="claude") is Claude.
+Embeddings (needed by ragas AnswerRelevancy regardless of judge provider — Anthropic
+has no embeddings API) run entirely locally and offline via local_embeddings.py,
+reusing the same Sentance_Transformer model the Node backend already uses for
+retrieval — not Ollama, whose model registry is blocked by this org's Zscaler proxy
+for large binary downloads.
 
 Metrics computed:
   - RAGAS    Faithfulness         (answer claims vs. retrieved context)
@@ -14,11 +20,16 @@ Metrics computed:
   - DeepEval Faithfulness         (contradiction-focused, retrieval_context-based)
   - DeepEval Hallucination        (actual_output vs. context)
   - DeepEval Contextual Relevancy* (are the retrieved chunks relevant to the question)
+  - DeepEval Hit Rate / MRR*      (derived from Contextual Relevancy's own per-chunk
+                                   verdicts — see run_deepeval — not a native ragas/deepeval
+                                   metric; neither library ships one)
 
   * Reference-free variants — scored from (question, answer, context) alone, no ground-truth
     answer required. True Context Recall ("did retrieval miss anything relevant that exists in
-    the source docs") needs a labeled ground-truth dataset to check against and isn't
-    computable from a single live request — add it once a labeled eval set exists.
+    the source docs"), and classically-defined Hit Rate/MRR (which need a labeled "known
+    relevant chunk" per query), all need a labeled ground-truth dataset to check against and
+    aren't computable from a single live request — add them once a labeled eval set exists.
+    Hit Rate/MRR here are LLM-judged reference-free proxies instead, not ground-truth-verified.
 
 Run standalone (see README section at the bottom of this file for full setup):
     uvicorn app:app --host 0.0.0.0 --port 8500
@@ -126,16 +137,17 @@ def _build_ragas_judge_llm(provider: str):
 
 
 def _build_ragas_embeddings():
-    # Anthropic has no embeddings API, so both providers share the same local Ollama
-    # embedding model — only the judge LLM differs between "ollama" and "claude".
+    # Anthropic has no embeddings API, so this can't come from the "claude" judge
+    # provider either way. Originally routed through Ollama regardless of judge
+    # provider — but Ollama's model registry is blocked by this organization's
+    # Zscaler proxy for large binary downloads (confirmed live: the "download" came
+    # back as a Zscaler interception page, not the model weights). Uses a local
+    # ONNX embedding model instead (same model + pooling the Node backend already
+    # uses for retrieval — see local_embeddings.py) — no network call at all, so
+    # this proxy restriction and Ollama's availability are both moot.
     from ragas.embeddings import LangchainEmbeddingsWrapper
-    try:
-        from langchain_ollama import OllamaEmbeddings
-    except ImportError:
-        from langchain_community.embeddings import OllamaEmbeddings
-    return LangchainEmbeddingsWrapper(
-        OllamaEmbeddings(model=OLLAMA_EMBED_MODEL, base_url=OLLAMA_BASE_URL)
-    )
+    from local_embeddings import LocalSentenceTransformerEmbeddings
+    return LangchainEmbeddingsWrapper(LocalSentenceTransformerEmbeddings())
 
 
 def _build_ragas_metrics():
@@ -300,6 +312,31 @@ def run_deepeval(question: str, answer: str, contexts: list, provider: str = "ol
     faithfulness_metric.measure(test_case)
     relevancy_metric.measure(test_case)
 
+    # Hit Rate / MRR — neither ragas nor deepeval ships either metric (confirmed by
+    # reading both packages' source), and their classic definitions need a labeled
+    # "known relevant chunk" per query, which doesn't exist for a live, single-turn
+    # chatbot with no eval dataset. Derived here instead as reference-free proxies from
+    # data ContextualRelevancyMetric already produced above, at zero extra LLM-call cost:
+    # after .measure(), relevancy_metric.verdicts_list holds one entry per input chunk,
+    # in the same order as `contexts` (confirmed via source read of deepeval 4.1.7's
+    # ContextualRelevancyMetric — a_measure/measure iterate `retrieval_context` in order
+    # and asyncio.gather preserves that order), each holding that chunk's own
+    # extracted-statement yes/no verdicts. A chunk counts as "relevant" if any statement
+    # extracted from it was judged "yes". This is an LLM's own relevance judgment
+    # standing in for ground truth, not a ground-truth-verified score.
+    chunk_relevant = [
+        any(v.verdict.strip().lower() == "yes" for v in chunk_verdicts.verdicts)
+        for chunk_verdicts in relevancy_metric.verdicts_list
+    ]
+    first_relevant_rank = next((i + 1 for i, relevant in enumerate(chunk_relevant) if relevant), None)
+    hit_rate = 1.0 if first_relevant_rank is not None else 0.0
+    mrr = round(1.0 / first_relevant_rank, 4) if first_relevant_rank is not None else 0.0
+    retrieval_rank_reason = (
+        f"First relevant chunk at rank {first_relevant_rank} of {len(chunk_relevant)} retrieved."
+        if first_relevant_rank is not None
+        else f"No retrieved chunk (0 of {len(chunk_relevant)}) was judged relevant to the question."
+    )
+
     # Hallucination is DERIVED from Faithfulness (1 - faithfulness) rather than measured
     # via deepeval's own HallucinationMetric — confirmed live, twice, that HallucinationMetric
     # gives unreliable results in this RAG setup: it treats the whole context as a single
@@ -320,6 +357,9 @@ def run_deepeval(question: str, answer: str, contexts: list, provider: str = "ol
         "hallucination_reason": f"Derived as (1 - Faithfulness) rather than measured independently — see code comment for why. Faithfulness reason: {faithfulness_metric.reason}",
         "contextual_relevancy": relevancy_metric.score,
         "contextual_relevancy_reason": relevancy_metric.reason,
+        "hit_rate": hit_rate,
+        "mrr": mrr,
+        "retrieval_rank_reason": retrieval_rank_reason,
     }
 
 
@@ -429,6 +469,9 @@ def _evaluate_with_provider(question: str, answer: str, contexts: list, provider
             "hallucination_reason": "Refusal detected — no claims were made, so nothing can be fabricated.",
             "contextual_relevancy": 0.0,
             "contextual_relevancy_reason": "Refusal detected — the retrieved context did not contain an answer, so it was correctly not used.",
+            "hit_rate": 0.0,
+            "mrr": 0.0,
+            "retrieval_rank_reason": "Refusal detected — no chunk was used, so none can be ranked relevant.",
         }
         deepeval_error = None
     else:
@@ -527,15 +570,18 @@ def evaluate_turn(req: EvalRequest):
 #        ..\venv\Scripts\Activate.ps1        (PowerShell)
 #   2. Install this service's dependencies:
 #        pip install -r requirements.txt
-#   3. Install Ollama (https://ollama.com) and pull the two models used here:
-#        ollama pull llama3.1
-#        ollama pull nomic-embed-text
-#   4. One-time deepeval config so the "ollama" provider defaults to Ollama instead
-#      of trying OpenAI:
-#        deepeval set-ollama llama3.1 --base-url="http://localhost:11434"
-#   5. (Optional, for the "claude" provider) Set ANTHROPIC_API_KEY in the project's
-#      root .env (same file Node's server.js already reads) — this service loads it
-#      from there automatically on startup.
+#      This includes onnxruntime + tokenizers for local_embeddings.py, which needs
+#      the Sentance_Transformer/ model folder (already in the repo) to be present —
+#      no download required for embeddings.
+#   3. Set ANTHROPIC_API_KEY in the project's root .env (same file Node's server.js
+#      already reads) — this service loads it from there automatically on startup.
+#      This is the only judge provider server.js actually requests.
+#   4. (Optional — only if you want the "ollama" judge provider) Install Ollama
+#      (https://ollama.com), pull a judge model (`ollama pull llama3.1`), and run
+#      `deepeval set-ollama llama3.1 --base-url="http://localhost:11434"`. Not
+#      needed for embeddings anymore (see local_embeddings.py), and note that
+#      Ollama's own model registry may be blocked by a restrictive network proxy —
+#      confirmed blocked in this org's environment for large binary downloads.
 #
 # RUN (every time, alongside `chroma run` and `npm start`):
 #        uvicorn app:app --host 0.0.0.0 --port 8500

@@ -195,8 +195,7 @@ async function runSingleNliWindow(premiseWindow, hypothesis) {
   });
   const { logits } = await nliPipeline.model(modelInputs);
   const probs = softmaxArray(Array.from(logits.data));
-  const id2lab
-  el = nliPipeline.model.config.id2label;
+  const id2label = nliPipeline.model.config.id2label;
 
   const scores = { entailment: 0, neutral: 0, contradiction: 0 };
   probs.forEach((p, i) => {
@@ -401,12 +400,15 @@ async function runCrossEncoderRerank(query, chunks, topN = 3) {
 
 
 function extractSourceFilenames(context) {
-  // Anchored on the literal "(Rerank: <number>)" tag this file itself appends when
+  // Anchored on the literal "(Rerank: ...)" tag this file itself appends when
   // building context (see runCrossEncoderRerank call site), rather than "any paren" —
   // a filename with its own parenthesis (e.g. "...Analytics (Nov'26 to Nov'27).pdf.txt")
   // used to end the match early at that internal paren and silently drop from the list,
-  // since the rest of the pattern then failed to find a literal "]" right after it.
-  const sourceFilenamePattern = /\[Source:\s*(.+?)\s*\(Rerank:\s*[\d.]+\)\]/g;
+  // since the rest of the pattern then failed to find a literal "]" right after it. The
+  // "Rerank:" literal keyword is what disambiguates a real tag from a filename's own
+  // paren — so what's inside the parens can be any non-')' content (a real score, or
+  // 'n/a' when the reranker fell back), not just digits, without reintroducing that bug.
+  const sourceFilenamePattern = /\[Source:\s*(.+?)\s*\(Rerank:\s*[^)]*\)\]/g;
   const uniqueSourceFilenames = new Set();
   let sourceMatch;
   while ((sourceMatch = sourceFilenamePattern.exec(context)) !== null) {
@@ -525,10 +527,17 @@ async function compileObservabilityTelemetry(query, response, context) {
 
   let ragasEvidence = "";
   let deepevalEvidence = "";
+  // Query-context similarity is a Node-side embedding heuristic, not a ragas or
+  // deepeval metric and not real (multi-chunk, ground-truth-checked) Context Recall —
+  // kept in its own bucket instead of folded into "ragas"/"deepeval" so the label
+  // stays honest now that the real ragas Context Precision / DeepEval Contextual
+  // Relevancy metrics are surfaced alongside it.
+  let localProxyEvidence = "";
 
   if (isRefusal) {
     ragasEvidence = `📐 EVALUATION CORE COMPASS:\n• Faithfulness 📄 -> Answer vs. Context\n• Answer Relevance 🧠 -> Answer vs. Query\n\n👉 STATUS: Strict Closed-Book Safety Refusal Enforced.\n🏆 PEAK REASON: Faithfulness is 100% because the model correctly refused to answer when no relevant document chunks were retrieved.`;
-    deepevalEvidence = `📐 EVALUATION CORE COMPASS:\n• Context Recall 📄 -> Context vs. Source PDF\n• Hallucination Index 🧠 -> Answer vs. Context (Inverse Check)\n\n👉 STATUS: Vector Search Returned Empty Pool. Hallucination is 0% due to full compliance with boundaries.`;
+    deepevalEvidence = `📐 EVALUATION CORE COMPASS:\n• Hallucination Index 🧠 -> Answer vs. Context (Inverse Check)\n\n👉 STATUS: Vector Search Returned Empty Pool. Hallucination is 0% due to full compliance with boundaries.`;
+    localProxyEvidence = `📐 LOCAL PROXY COMPASS:\n• Query-Context Similarity 📄 -> Query vs. Retrieved Context (instant local embedding proxy, NOT ground-truth-verified)\n\n👉 STATUS: Vector Search Returned Empty Pool. Similarity forced to 0% since no context was used.`;
   } else {
     const faithfulnessMethodLabel = faithfulnessMethod === 'nli_entailment'
       ? 'a local NLI entailment model (Xenova/mobilebert-uncased-mnli) scoring each response sentence against the retrieved context'
@@ -540,10 +549,12 @@ async function compileObservabilityTelemetry(query, response, context) {
       ragasEvidence = `📐 EVALUATION CORE COMPASS:\n📊 Faithfulness Metric Evaluates: [Answer vs. Context Mapping]\n🎯 Answer Relevance Metric Evaluates: [Answer vs. Query Alignment]\n\n📉 DROP REASON (Faithfulness = ${Math.round(faithfulness*100)}%): Computed via ${faithfulnessMethodLabel} — several statements show low entailment against the reranked chunks.`;
     }
 
+    deepevalEvidence = `📐 EVALUATION CORE COMPASS:\n⚠️ Hallucination Index Metric Evaluates: [Answer vs. Context (Inverse Check)]\n\n🛡️ AUDITOR MATRIX (Hallucination Index = ${Math.round(hallucinationIndex*100)}%): ${Math.round(faithfulness*100)}% mean NLI entailment across response sentences — ${faithfulnessMethod === 'nli_entailment' ? 'real local NLI model' : 'lexical fallback'} scoring.`;
+
     if (contextRecall >= 0.80) {
-      deepevalEvidence = `📐 EVALUATION CORE COMPASS:\n🗂️ Context Recall Metric Evaluates: [Context vs. Source PDF Map]\n⚠️ Hallucination Index Metric Evaluates: [Answer vs. Context (Inverse Check)]\n\n🏆 PEAK REASON (Context Recall = ${Math.round(contextRecall*100)}%): Real embedding cosine similarity between query and context vectors is high (keyword cross-check: ${matchedQueryWords.length}/${queryWords.length} core terms also present literally).\n\n🛡️ AUDITOR MATRIX (Hallucination Index = ${Math.round(hallucinationIndex*100)}%): ${Math.round(faithfulness*100)}% mean NLI entailment across response sentences — ${faithfulnessMethod === 'nli_entailment' ? 'real local NLI model' : 'lexical fallback'} scoring.`;
+      localProxyEvidence = `📐 LOCAL PROXY COMPASS:\n🗂️ Query-Context Similarity Evaluates: [Query vs. Retrieved Context] — instant local embedding proxy, NOT a ground-truth-verified retrieval metric.\n\n🏆 PEAK REASON (Similarity = ${Math.round(contextRecall*100)}%): Real embedding cosine similarity between query and context vectors is high (keyword cross-check: ${matchedQueryWords.length}/${queryWords.length} core terms also present literally).`;
     } else {
-      deepevalEvidence = `📐 EVALUATION CORE COMPASS:\n🗂️ Context Recall Metric Evaluates: [Context vs. Source PDF Map]\n⚠️ Hallucination Index Metric Evaluates: [Answer vs. Context (Inverse Check)]\n\n📉 DROP REASON (Context Recall = ${Math.round(contextRecall*100)}%): The search engine failed to capture all key background facts.`;
+      localProxyEvidence = `📐 LOCAL PROXY COMPASS:\n🗂️ Query-Context Similarity Evaluates: [Query vs. Retrieved Context] — instant local embedding proxy, NOT a ground-truth-verified retrieval metric.\n\n📉 DROP REASON (Similarity = ${Math.round(contextRecall*100)}%): The retrieved context has low embedding similarity to the query.`;
     }
   }
 
@@ -553,10 +564,12 @@ async function compileObservabilityTelemetry(query, response, context) {
   const citationLine = `\n\n📚 CITED SOURCES:\n${sourceFileList.map(name => `• ${name}`).join('\n')}`;
   ragasEvidence += citationLine;
   deepevalEvidence += citationLine;
+  localProxyEvidence += citationLine;
 
   return {
-    ragas: { faithfulness, answer_relevance: answerRelevance, context_recall: contextRecall, evidence: ragasEvidence },
+    ragas: { faithfulness, answer_relevance: answerRelevance, evidence: ragasEvidence },
     deepeval: { faithfulness_score: faithfulness, answer_relevancy_score: answerRelevance, hallucination_score: hallucinationIndex, evidence: deepevalEvidence },
+    local_proxy: { query_context_similarity: contextRecall, evidence: localProxyEvidence },
     langsmith_report: {
       project: "hm-chatbot-rag-production",
       run_id: `span-id-${Math.random().toString(36).slice(2, 10)}`,
@@ -677,7 +690,11 @@ app.post('/api/chat', async (req, res) => {
       }
       rerankedCount = mergedPool.length;
       if (mergedPool.length > 0) {
-        context = mergedPool.map(c => `[Source: ${c.source} (Rerank: ${c.rerankScore?.toFixed(4)})]:\n${c.text}`).join('\n\n');
+        // c.rerankScore is missing whenever runCrossEncoderRerank fell back (reranker
+        // unavailable/errored) — format explicitly as 'n/a' instead of the literal
+        // string "undefined", which used to break extractSourceFilenames()'s regex
+        // below and silently drop citation display right when retrieval had degraded.
+        context = mergedPool.map(c => `[Source: ${c.source} (Rerank: ${c.rerankScore != null ? c.rerankScore.toFixed(4) : 'n/a'})]:\n${c.text}`).join('\n\n');
       }
     } catch (err) { console.error(err); }
   }
@@ -717,11 +734,11 @@ app.post('/api/chat', async (req, res) => {
         // The resample call below intentionally STAYS at 0.9 — its whole purpose is to be a
         // genuinely different sample for the black-box self-consistency check.
         { model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', messages, max_tokens: 1024, temperature: 0, logprobs: true },
-        { headers: { Authorization: `Bearer ${TOGETHER_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000, httpsAgent: agent }
+        { headers: { Authorization: `Bearer ${TOGETHER_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 60000, httpsAgent: agent }
       ),
       axios.post('https://api.together.xyz/v1/chat/completions',
         { model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', messages, max_tokens: 512, temperature: 0.9 },
-        { headers: { Authorization: `Bearer ${TOGETHER_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000, httpsAgent: agent }
+        { headers: { Authorization: `Bearer ${TOGETHER_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 60000, httpsAgent: agent }
       ).catch(err => { console.error('[Black Box Resample Error]:', err.message); return null; })
     ]);
 
@@ -827,7 +844,12 @@ app.post('/api/chat', async (req, res) => {
 
   const llmLatency = Date.now() - startTime;
   const hmStart = Date.now();
-  const guardrail = await runGuardrailCheck({
+  // Skip the entire guardrail ensemble (7 scorers, including 3 external LLM-judge API
+  // calls) when the primary LLM call already failed — there is no generated answer to
+  // guard/score, and every downstream consumer of `guardrail` below is already gated on
+  // `!networkBlocked` via short-circuit evaluation, so running this only to discard the
+  // result wasted real API calls (and their own latency/failure risk) for nothing.
+  const guardrail = networkBlocked ? null : await runGuardrailCheck({
     // `policies: []` was previously hardcoded here, making responsibleAI.js's
     // toxicity/bias/jailbreak checks dead code — now fed real active policies.
     // `defaultAction: 'none'` (was 'annotate') — the UI's own verdict/risk badge
@@ -847,7 +869,13 @@ app.post('/api/chat', async (req, res) => {
   });
   const hmLatency = Date.now() - hmStart;
 
-  const obsTelemetry = await compileObservabilityTelemetry(message, llmResponse, context);
+  // Scoring the literal error string ("Inference timeout connection failure: ...") against
+  // the context as if it were a real answer previously produced misleadingly plausible-
+  // looking Faithfulness/Relevance percentages for a non-answer. Skip telemetry entirely on
+  // a network failure and say so honestly instead — there is nothing to evaluate.
+  const obsTelemetry = networkBlocked
+    ? { system_error: true, message: 'LLM inference call failed or timed out — no answer was generated, so there is nothing to evaluate.' }
+    : await compileObservabilityTelemetry(message, llmResponse, context);
 
   // Enforce the guardrail's mitigation decision: previously `guardrail.mitigation_action`
   // was computed by agents/mitigation.js but silently discarded — a "block" verdict
@@ -874,6 +902,21 @@ app.post('/api/chat', async (req, res) => {
     neurosymbolic: networkBlocked ? 0.00 : (guardrail.scorers?.neuro_symbolic?.confidence ?? 0.75)
   };
 
+  // The 6 real scorer objects above (guardrail.scorers.*) carry far more than a single
+  // confidence number — e.g. llm_judge's individual per-provider votes/rationale,
+  // factual's per-claim evidence, neuro_symbolic's rule-by-rule notes — but until now
+  // none of it ever left this file; only the flattened confidence in alignedScorers did.
+  // Forwarded here unmodified (not re-derived/summarized) so the UI can show the SAME
+  // real data the ensemble score was actually computed from, not a re-interpretation of it.
+  const scorerDetail = networkBlocked ? null : {
+    factual: guardrail.scorers?.factual || null,
+    black_box: guardrail.scorers?.black_box || null,
+    white_box: guardrail.scorers?.white_box || null,
+    llm_judge: guardrail.scorers?.llm_judge || null,
+    groundedness: guardrail.scorers?.groundedness || null,
+    neuro_symbolic: guardrail.scorers?.neuro_symbolic || null,
+  };
+
   // A guardrail-blocked exchange is excluded from history too, same as a network
   // failure — the risky original text shouldn't carry forward into future context
   // just because the user only saw the refusal message.
@@ -896,13 +939,34 @@ app.post('/api/chat', async (req, res) => {
     runRealEvalAsync(realEvalId, { question: message, answer: rawLlmResponse, context, maskedAnswer: llmResponse });
   }
 
+  // `networkBlocked` (the LLM call itself failed) and "no context was retrieved, so the
+  // model correctly gave the fixed refusal message" used to share the exact same
+  // hardcoded pass/100%/LOW fallback — conflating "the system broke" with "the system
+  // worked correctly and safely declined." A failed inference call is scored as an
+  // explicit block/0% instead, distinct from both the real guardrail-scored case and the
+  // legitimate deterministic-refusal case.
+  let verdict, ensemble_score, risk_level, interpretation;
+  if (networkBlocked) {
+    verdict = 'block';
+    ensemble_score = 0.00;
+    risk_level = 'ERROR';
+    interpretation = 'LLM inference call failed or timed out — no answer was generated. This reflects a system/network failure, not a content-quality judgment.';
+  } else if (!context.trim()) {
+    verdict = 'pass';
+    ensemble_score = 1.00;
+    risk_level = 'LOW';
+    interpretation = 'Financial and PII metrics successfully audited via dynamic rule constraints.';
+  } else {
+    verdict = guardrail.verdict || 'pass';
+    ensemble_score = guardrail.ensemble_score || 0.91;
+    risk_level = guardrail.risk_level || 'LOW';
+    interpretation = 'Financial and PII metrics successfully audited via dynamic rule constraints.';
+  }
+
   res.json({
     session_id, message, response: llmResponse, llm_latency: llmLatency, hm_latency: hmLatency,
-    verdict: context.trim() && !networkBlocked ? (guardrail.verdict || 'pass') : 'pass',
-    ensemble_score: context.trim() && !networkBlocked ? (guardrail.ensemble_score || 0.91) : 1.00,
-    risk_level: context.trim() && !networkBlocked ? (guardrail.risk_level || 'LOW') : 'LOW',
-    interpretation: context.trim() && !networkBlocked ? 'Financial and PII metrics successfully audited via dynamic rule constraints.' : 'Safety compliance loop active.',
-    scorers: alignedScorers, retrieved_chunks: context || "No context chunks retrieved.",
+    verdict, ensemble_score, risk_level, interpretation,
+    scorers: alignedScorers, scorer_detail: scorerDetail, retrieved_chunks: context || "No context chunks retrieved.",
     search_parameters: { bi_encoder_top_k_fetched: rawFetchedCount, cross_encoder_top_n_returned: rerankedCount, distance_metric: "cosine + Cross-Encoder Rerank" },
     observability: obsTelemetry,
     real_eval_id: realEvalId,

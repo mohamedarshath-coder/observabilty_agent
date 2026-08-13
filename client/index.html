@@ -4,14 +4,25 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Hallucination Manager Chatbot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<script>
+  (function() {
+    var t = localStorage.getItem('hm-theme') === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
 <style>
 :root {
+  --font-main: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
   --bg-main:      #070a13;
   --bg-surface:   #0f1322;
   --bg-surface-s: #171d34;
   --border-color: rgba(255, 255, 255, 0.06);
   --border-focus: rgba(12, 184, 170, 0.4);
-  
+
   --teal:    #0cb8aa;
   --mint:    #02c39a;
   --coral:   #ff5c6c;
@@ -21,11 +32,35 @@
   --light:   #f1f5f9;
   --muted:   #94a3b8;
   --gray:    #cbd5e1;
-  
-  --pass:    #02c39a;
-  --warn:    #f4a261;
-  --block:   #ff5c6c;
-  
+  --text-heading: #ffffff;
+
+  --pass:    var(--mint);
+  --warn:    var(--amber);
+  --block:   var(--coral);
+
+  --pass-bg:      rgba(2, 195, 154, 0.1);
+  --pass-border:  rgba(2, 195, 154, 0.2);
+  --warn-bg:      rgba(244, 162, 97, 0.1);
+  --warn-border:  rgba(244, 162, 97, 0.2);
+  --block-bg:     rgba(255, 92, 108, 0.1);
+  --block-border: rgba(255, 92, 108, 0.2);
+
+  --pass-bg-soft:      rgba(2, 195, 154, 0.04);
+  --pass-border-soft:  rgba(2, 195, 154, 0.15);
+  --warn-bg-soft:      rgba(244, 162, 97, 0.04);
+  --warn-border-soft:  rgba(244, 162, 97, 0.15);
+  --block-bg-soft:     rgba(255, 92, 108, 0.04);
+  --block-border-soft: rgba(255, 92, 108, 0.15);
+
+  --overlay-soft:          rgba(255, 255, 255, 0.05);
+  --overlay-soft-strong:   rgba(255, 255, 255, 0.1);
+  --overlay-soft-hover:    rgba(255, 255, 255, 0.15);
+  --overlay-recess:        rgba(0, 0, 0, 0.15);
+  --overlay-recess-strong: rgba(0, 0, 0, 0.2);
+  --overlay-teal-soft:     rgba(12, 184, 170, 0.03);
+  --surface-sticky-bg: rgba(15, 19, 34, 0.95);
+  --surface-tint-40:   rgba(15, 19, 34, 0.4);
+
   --chat-w:  55%;
   --radius-lg: 24px;
   --radius-md: 14px;
@@ -33,13 +68,53 @@
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; overflow: hidden; background: var(--bg-main); color: var(--light); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+:root[data-theme="light"] {
+  --bg-main:      #f8fafc;
+  --bg-surface:   #ffffff;
+  --bg-surface-s: #eef1f6;
+  --border-color: rgba(15, 23, 42, 0.1);
+  --border-focus: rgba(12, 184, 170, 0.45);
+
+  --light:   #1e293b;
+  --muted:   #64748b;
+  --gray:    #475569;
+  --text-heading: #0f172a;
+
+  --pass:  #029c7c;
+  --warn:  #c67c1e;
+  --block: #d63447;
+
+  --pass-bg:      rgba(2, 156, 124, 0.12);
+  --pass-border:  rgba(2, 156, 124, 0.3);
+  --warn-bg:      rgba(198, 124, 30, 0.12);
+  --warn-border:  rgba(198, 124, 30, 0.3);
+  --block-bg:     rgba(214, 52, 71, 0.12);
+  --block-border: rgba(214, 52, 71, 0.3);
+
+  --pass-bg-soft:      rgba(2, 156, 124, 0.06);
+  --pass-border-soft:  rgba(2, 156, 124, 0.2);
+  --warn-bg-soft:      rgba(198, 124, 30, 0.06);
+  --warn-border-soft:  rgba(198, 124, 30, 0.2);
+  --block-bg-soft:     rgba(214, 52, 71, 0.06);
+  --block-border-soft: rgba(214, 52, 71, 0.2);
+
+  --overlay-soft:          rgba(15, 23, 42, 0.05);
+  --overlay-soft-strong:   rgba(15, 23, 42, 0.12);
+  --overlay-soft-hover:    rgba(15, 23, 42, 0.22);
+  --overlay-recess:        rgba(15, 23, 42, 0.05);
+  --overlay-recess-strong: rgba(15, 23, 42, 0.07);
+  --overlay-teal-soft:     rgba(12, 184, 170, 0.05);
+  --surface-sticky-bg: rgba(255, 255, 255, 0.92);
+  --surface-tint-40:   rgba(241, 245, 249, 0.7);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font: inherit; }
+html, body { height: 100%; overflow: hidden; background: var(--bg-main); color: var(--light); font-family: var(--font-main); -webkit-font-smoothing: antialiased; }
 
 .messages::-webkit-scrollbar, .score-panel::-webkit-scrollbar { width: 6px; }
 .messages::-webkit-scrollbar-track, .score-panel::-webkit-scrollbar-track { background: transparent; }
-.messages::-webkit-scrollbar-thumb, .score-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
-.messages::-webkit-scrollbar-thumb:hover, .score-panel::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+.messages::-webkit-scrollbar-thumb, .score-panel::-webkit-scrollbar-thumb { background: var(--overlay-soft-strong); border-radius: 4px; }
+.messages::-webkit-scrollbar-thumb:hover, .score-panel::-webkit-scrollbar-thumb:hover { background: var(--overlay-soft-hover); }
 
 header {
   background: var(--bg-main); border-bottom: 1px solid var(--border-color);
@@ -50,7 +125,7 @@ header {
   width: 32px; height: 32px; background: linear-gradient(135deg, var(--teal), var(--mint));
   border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 16px;
 }
-header h1 { font-size: 15px; font-weight: 700; color: var(--white); letter-spacing: -0.2px; }
+header h1 { font-size: 15px; font-weight: 700; color: var(--text-heading); letter-spacing: -0.2px; }
 header p { font-size: 11px; color: var(--teal); font-weight: 500; }
 .status-dot { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--pass); box-shadow: 0 0 8px var(--pass); animation: pulse 2s infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -73,9 +148,9 @@ header p { font-size: 11px; color: var(--teal); font-weight: 500; }
 
 .msg-footer { font-size: 11px; color: var(--muted); margin-top: 8px; display: flex; align-items: center; gap: 8px; }
 .verdict-badge { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 30px; text-transform: uppercase; letter-spacing: 0.5px; }
-.verdict-badge.pass { background: rgba(2, 195, 154, 0.1); color: var(--pass); border: 1px solid rgba(2, 195, 154, 0.2); }
-.verdict-badge.warn { background: rgba(244, 162, 97, 0.1); color: var(--amber); border: 1px solid rgba(244, 162, 97, 0.2); }
-.verdict-badge.block { background: rgba(255, 92, 108, 0.1); color: var(--coral); border: 1px solid rgba(255, 92, 108, 0.2); }
+.verdict-badge.pass { background: var(--pass-bg); color: var(--pass); border: 1px solid var(--pass-border); }
+.verdict-badge.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-border); }
+.verdict-badge.block { background: var(--block-bg); color: var(--block); border: 1px solid var(--block-border); }
 
 .typing { display: flex; align-items: center; gap: 5px; padding: 14px 20px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); border-top-left-radius: 4px; }
 .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); animation: bounce 0.9s infinite; }
@@ -91,32 +166,32 @@ header p { font-size: 11px; color: var(--teal); font-weight: 500; }
 .input-container-wrapper:focus-within { border-color: rgba(12, 184, 170, 0.5); }
 
 .rag-upload-zone {
-  background: rgba(0,0,0,0.15); border: 1px dashed rgba(12, 184, 170, 0.3); border-radius: var(--radius-md);
+  background: var(--overlay-recess); border: 1px dashed rgba(12, 184, 170, 0.3); border-radius: var(--radius-md);
   padding: 14px; text-align: center; font-size: 12.5px; color: var(--muted); cursor: pointer; transition: var(--transition);
 }
-.rag-upload-zone:hover { border-color: var(--teal); color: var(--white); background: rgba(12, 184, 170, 0.02); }
+.rag-upload-zone:hover { border-color: var(--teal); color: var(--text-heading); background: var(--overlay-teal-soft); }
 .active-files-tray { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .file-chip { background: var(--bg-surface-s); border: 1px solid var(--border-color); font-size: 11px; padding: 3px 10px; border-radius: 20px; display: flex; align-items: center; gap: 6px; color: var(--light); }
 
 .input-row { display: flex; gap: 12px; align-items: center; }
 .model-select {
-  background: var(--bg-surface-s); border: 1px solid rgba(255,255,255,0.1); color: var(--white);
+  background: var(--bg-surface-s); border: 1px solid var(--overlay-soft-strong); color: var(--text-heading);
   font-size: 13px; font-weight: 500; padding: 8px 12px; border-radius: 30px; outline: none; max-width: 180px;
 }
-.model-select option { background-color: var(--bg-surface-s) !important; color: var(--white) !important; padding: 8px; }
+.model-select option { background-color: var(--bg-surface-s) !important; color: var(--text-heading) !important; padding: 8px; }
 
 #user-input {
-  flex: 1; background: transparent; border: none; color: var(--white); font-size: 14.5px;
+  flex: 1; background: transparent; border: none; color: var(--text-heading); font-size: 14.5px;
   padding: 6px 4px; resize: none; outline: none; font-family: inherit; max-height: 90px; min-height: 28px; line-height: 1.5;
 }
 #user-input::placeholder { color: var(--muted); }
 
 .action-buttons-group { display: flex; align-items: center; gap: 8px; }
 .clear-btn { background: transparent; border: none; color: var(--muted); font-size: 13px; font-weight: 500; padding: 8px 12px; border-radius: 30px; cursor: pointer; }
-.clear-btn:hover { color: var(--coral); background: rgba(255, 92, 108, 0.08); }
+.clear-btn:hover { color: var(--coral); background: var(--block-bg); }
 
 .send-btn {
-  width: 36px; height: 36px; background: var(--white); color: var(--bg-main); border: none;
+  width: 36px; height: 36px; background: var(--text-heading); color: var(--bg-main); border: none;
   border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px;
 }
 .send-btn:hover { background: var(--teal); color: var(--white); }
@@ -126,22 +201,22 @@ header p { font-size: 11px; color: var(--teal); font-weight: 500; }
 
 .sp-header {
   padding: 24px 32px 12px; border-bottom: 1px solid var(--border-color);
-  position: sticky; top: 0; background: rgba(15, 19, 34, 0.95); backdrop-filter: blur(8px); z-index: 5;
+  position: sticky; top: 0; background: var(--surface-sticky-bg); backdrop-filter: blur(8px); z-index: 5;
 }
 .sp-header h3 { font-size: 12px; font-weight: 700; color: var(--teal); letter-spacing: 0.8px; text-transform: uppercase; }
 .sp-header .sp-q { font-size: 13px; color: var(--muted); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 12px; }
 
-.sp-nav-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.05); gap: 4px; padding-top: 4px; }
+.sp-nav-tabs { display: flex; border-bottom: 1px solid var(--overlay-soft); gap: 4px; padding-top: 4px; }
 .sp-tab-btn { background: transparent; border: none; color: var(--muted); font-size: 11px; font-weight: 600; padding: 8px 12px; cursor: pointer; position: relative; transition: var(--transition); outline: none; }
-.sp-tab-btn:hover { color: var(--white); }
+.sp-tab-btn:hover { color: var(--text-heading); }
 .sp-tab-btn.active { color: var(--teal); }
 .sp-tab-btn.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: var(--teal); }
 
 .sp-verdict { margin: 24px 32px; padding: 18px 24px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 16px; }
-.sp-verdict.idle  { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); }
-.sp-verdict.pass  { background: rgba(2, 195, 154, 0.04); border: 1px solid rgba(2, 195, 154, 0.15); }
-.sp-verdict.warn  { background: rgba(244, 162, 97, 0.04); border: 1px solid rgba(244, 162, 97, 0.15); }
-.sp-verdict.block { background: rgba(255, 92, 108, 0.04); border: 1px solid rgba(255, 92, 108, 0.15); }
+.sp-verdict.idle  { background: var(--overlay-soft); border: 1px solid var(--border-color); }
+.sp-verdict.pass  { background: var(--pass-bg-soft); border: 1px solid var(--pass-border-soft); }
+.sp-verdict.warn  { background: var(--warn-bg-soft); border: 1px solid var(--warn-border-soft); }
+.sp-verdict.block { background: var(--block-bg-soft); border: 1px solid var(--block-border-soft); }
 .sp-verdict-dot { width: 8px; height: 8px; border-radius: 50%; }
 .sp-verdict.idle .sp-verdict-dot { background: var(--muted); }
 .sp-verdict.pass .sp-verdict-dot { background: var(--pass); box-shadow: 0 0 10px var(--pass); }
@@ -151,38 +226,52 @@ header p { font-size: 11px; color: var(--teal); font-weight: 500; }
 .sp-verdict-label { font-size: 17px; font-weight: 700; text-transform: uppercase; }
 .sp-verdict.idle .sp-verdict-label { color: var(--muted); }
 .sp-verdict.pass .sp-verdict-label { color: var(--pass); }
-.sp-verdict.warn .sp-verdict-label { color: var(--amber); }
-.sp-verdict.block .sp-verdict-label { color: var(--coral); }
+.sp-verdict.warn .sp-verdict-label { color: var(--warn); }
+.sp-verdict.block .sp-verdict-label { color: var(--block); }
 
 .sp-score-big { font-size: 24px; font-weight: 800; margin-left: auto; letter-spacing: -0.5px; }
 .sp-verdict.idle .sp-score-big { color: var(--muted); }
 .sp-verdict.pass .sp-score-big { color: var(--pass); }
-.sp-verdict.warn .sp-score-big { color: var(--amber); }
-.sp-verdict.block .sp-score-big { color: var(--coral); }
+.sp-verdict.warn .sp-score-big { color: var(--warn); }
+.sp-verdict.block .sp-score-big { color: var(--block); }
 .sp-risk { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-top: 2px; }
 
 .sp-section { padding: 0 32px 24px; }
-.sp-section-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.04); }
+.sp-section-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; padding-top: 20px; border-top: 1px solid var(--overlay-soft); }
 
-.sbar { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
+.sbar { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--overlay-soft); }
 .sbar:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 .sbar-header { display: flex; justify-content: space-between; margin-bottom: 6px; align-items: center; }
-.sbar-name { font-size: 13.5px; font-weight: 600; color: var(--white); }
+.sbar-name { font-size: 13.5px; font-weight: 600; color: var(--text-heading); }
 .sbar-pct { font-size: 14px; font-weight: 700; color: var(--teal); }
-.sbar-track { height: 4px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; overflow: hidden; margin: 6px 0 8px; }
+.sbar-track { height: 4px; background: var(--overlay-soft); border-radius: 4px; overflow: hidden; margin: 6px 0 8px; }
 .sbar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
-.sbar-formula { font-family: monospace; font-size: 10px; color: rgba(12, 184, 170, 0.9); background: rgba(12, 184, 170, 0.03); border-radius: var(--radius-sm); padding: 8px 12px; margin-top: 8px; line-height: 1.5; white-space: pre-wrap; }
+.sbar-formula { font-family: monospace; font-size: 10px; color: rgba(12, 184, 170, 0.9); background: var(--overlay-teal-soft); border-radius: var(--radius-sm); padding: 8px 12px; margin-top: 8px; line-height: 1.5; white-space: pre-wrap; }
 .sbar-detail-toggle { font-size: 11px; color: var(--teal); font-weight: 500; cursor: pointer; background: none; border: none; padding: 0; margin-top: 8px; display: inline-flex; align-items: center; gap: 4px; }
-.sbar-extra { display: none; margin-top: 10px; background: rgba(0,0,0,0.15); padding: 12px; border-radius: var(--radius-sm); font-size: 12px; color: var(--gray); line-height: 1.5; }
+.sbar-extra { display: none; margin-top: 10px; padding: 14px; border-radius: var(--radius-sm); font-size: 12px; color: var(--gray); line-height: 1.6; font-family: var(--font-main); border: 1px dashed; }
 .sbar-extra.open { display: block; }
+
+/* Nested inside .sbar-extra rather than combined on the same element on purpose — putting
+   `display: flex` directly on `.sbar-extra` would fight its own `.sbar-extra.open { display:
+   block }` open/close toggle at equal CSS specificity (same single-class selector weight),
+   with source order deciding the winner — which silently made the box permanently visible
+   regardless of the .open class. Keeping .sbar-extra's display solely responsible for open/
+   closed, and .how-block only for the internal layout once visible, avoids that conflict. */
+.how-block { display: flex; flex-direction: column; gap: 10px; white-space: normal; }
+.how-label { display: block; font-size: 9px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--teal); opacity: 0.85; margin-bottom: 3px; }
+.how-formula { color: var(--gray); }
+.how-result { color: var(--text-heading); font-weight: 600; }
+.how-list { margin: 0; padding-left: 18px; color: var(--gray); }
+.how-list li { margin-bottom: 5px; }
+.how-list li:last-child { margin-bottom: 0; }
 
 .doc-list-item {
   display: flex; align-items: center; justify-content: space-between;
-  background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);
+  background: var(--overlay-soft); border: 1px solid var(--border-color);
   padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 8px;
 }
 .doc-info-block { display: flex; flex-direction: column; gap: 4px; }
-.doc-name-text { font-size: 13px; font-weight: 600; color: var(--white); word-break: break-all; }
+.doc-name-text { font-size: 13px; font-weight: 600; color: var(--text-heading); word-break: break-all; }
 .doc-meta-text { font-size: 11px; color: var(--muted); }
 
 .latency-row { display: flex; gap: 6px; padding: 0 32px 24px; flex-wrap: wrap; }
@@ -200,22 +289,45 @@ header p { font-size: 11px; color: var(--teal); font-weight: 500; }
 
 .mode-indicator { font-size: 12px; font-weight: 600; color: var(--teal); min-width: 110px; text-align: center; letter-spacing: 0.3px; }
 .toggle-switch {
-  position: relative; width: 56px; height: 28px; background: rgba(255, 255, 255, 0.1);
+  position: relative; width: 56px; height: 28px; background: var(--overlay-soft-strong);
   border-radius: 14px; border: 2px solid var(--border-color); cursor: pointer; display: flex; align-items: center;
 }
 .toggle-switch input { display: none; }
-.slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.05); border-radius: 12px; transition: all 0.3s ease; }
+.slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--overlay-soft); border-radius: 12px; transition: all 0.3s ease; }
 .slider::before { content: ''; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; background: var(--white); border-radius: 11px; }
 .toggle-switch input:checked + .slider { background: linear-gradient(90deg, var(--amber), #f4a261); border-color: var(--amber); }
 .toggle-switch input:checked + .slider::before { transform: translateX(24px); }
 
+.theme-toggle-container { display: flex; align-items: center; gap: 10px; margin-left: 20px; flex-shrink: 0; }
+.theme-icon { font-size: 14px; opacity: 0.8; }
+.theme-switch input:checked + .slider { background: linear-gradient(90deg, var(--teal), var(--mint)); border-color: var(--teal); }
+
 .welcome { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px 24px; margin: auto; width: 100%; max-width: 680px; }
 .welcome-hero { text-align: center; margin-bottom: 32px; }
-.welcome h2 { font-size: 26px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+.welcome h2 { font-size: 26px; font-weight: 700; color: var(--text-heading); margin-bottom: 8px; }
 .welcome p { font-size: 13.5px; color: var(--muted); max-width: 460px; margin: 0 auto; line-height: 1.6; }
 .suggestions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; width: 100%; margin-top: 8px; }
-.suggest-btn { background: rgba(15, 19, 34, 0.4); border: 1px solid var(--border-color); color: var(--gray); padding: 16px 20px; border-radius: var(--radius-md); cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 6px; }
+.suggest-btn { background: var(--surface-tint-40); border: 1px solid var(--border-color); color: var(--gray); padding: 16px 20px; border-radius: var(--radius-md); cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 6px; }
 .suggest-text { font-size: 13px; }
+
+.status-box { padding: 10px 14px; margin-bottom: 12px; border-radius: var(--radius-sm); font-size: 11.5px; }
+.status-box--pending { background: var(--overlay-recess); border: 1px solid var(--border-color); color: var(--muted); }
+.status-box--unavailable { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn); }
+.status-box--result { padding: 12px 14px; }
+.status-box--pass { background: var(--pass-bg); border: 1px solid var(--pass); }
+.status-box--fail { background: var(--block-bg); border: 1px solid var(--block); }
+.status-box-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+.status-box--pass .status-box-title { color: var(--pass); }
+.status-box--fail .status-box-title { color: var(--block); }
+.status-box-detail { font-size: 11.5px; color: var(--gray); line-height: 1.5; }
+
+.metric-tile { background: var(--overlay-recess); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); }
+
+.trace-box { font-size: 12.5px; background: var(--overlay-recess-strong); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); color: var(--gray); display: flex; flex-direction: column; gap: 8px; }
+
+.retrieved-chunks-box { font-size: 13px; background: var(--overlay-teal-soft); border: 1px dashed rgba(12, 184, 170, 0.2); padding: 16px; border-radius: var(--radius-sm); max-height: 400px; overflow-y: auto; color: var(--light); white-space: pre-wrap; font-family: monospace; }
+
+.btn-danger { background: var(--block-bg); border: 1px solid var(--block-border); color: var(--block); font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -241,6 +353,14 @@ header p { font-size: 11px; color: var(--teal); font-weight: 500; }
     <div class="mode-indicator" id="mode-indicator">📄 PDF Mode</div>
   </div>
   <div class="status-dot" id="status-dot"></div>
+  <div class="theme-toggle-container">
+    <span class="theme-icon">☀️</span>
+    <label class="toggle-switch theme-switch">
+      <input type="checkbox" id="theme-toggle-checkbox" onchange="toggleTheme()">
+      <span class="slider"></span>
+    </label>
+    <span class="theme-icon">🌙</span>
+  </div>
 </header>
 
 <div class="layout">
@@ -291,6 +411,17 @@ let globalLastData = null;
 let activePanelTab = 'library';
 let cachedIndexedFiles = [];
 const realEvalCache = {}; // evalId -> { status: 'pending'|'ready'|'error', ragas, deepeval, ragas_error, deepeval_error, message }
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const cb = document.getElementById('theme-toggle-checkbox');
+  if (cb) cb.checked = (theme === 'light');
+}
+function toggleTheme() {
+  const theme = document.getElementById('theme-toggle-checkbox').checked ? 'light' : 'dark';
+  localStorage.setItem('hm-theme', theme);
+  applyTheme(theme);
+}
 
 // Polls /api/real-eval/:evalId for the real ragas/deepeval scores computed by the
 // Python eval_service (fired asynchronously by the server so the chat answer doesn't
@@ -373,7 +504,11 @@ function toggleEvidenceContainer(btn) {
   const container = btn.nextElementSibling;
   if (container) {
     container.classList.toggle('open');
-    btn.textContent = container.classList.contains('open') ? '▼ Hide Evidence' : '▶ Show Evidence';
+    // Generic arrow flip that preserves whatever the button's own label already says
+    // (e.g. "How is this calculated?") instead of overwriting it with a hardcoded
+    // "Show/Hide Evidence" — this button is reused for several different labels now.
+    const isOpen = container.classList.contains('open');
+    btn.textContent = (isOpen ? '▼ ' : '▶ ') + btn.textContent.slice(2);
   }
 }
 
@@ -491,7 +626,12 @@ function appendMsg(role, text, data, id) {
   }
   div.innerHTML = `<div class="avatar">${avatar}</div><div><div class="bubble"></div>${footer}</div>`;
   const b = div.querySelector('.bubble');
-  if (b) { b.textContent = text; b.innerHTML = b.innerHTML.replace(/\n/g, '<br>'); }
+  if (b) {
+    b.textContent = text;
+    // textContent above already HTML-escapes everything, so it's safe to convert the
+    // now-literal **markdown bold** markers and newlines into real markup afterward.
+    b.innerHTML = b.innerHTML.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+  }
   msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
 }
 
@@ -553,6 +693,27 @@ function renderTabContent(data) {
   const vc = data.verdict || 'warn';
   let html = '';
 
+  if (activePanelTab === 'metrics' && data.observability?.system_error) {
+    // The LLM call itself failed (timeout/network error) — there is no generated answer
+    // to evaluate, so show that plainly instead of running fabricated-looking Faithfulness/
+    // Relevance/etc. percentages against the literal error string (a real bug this used to
+    // have: the error text was silently scored as if it were content).
+    html += `
+      <div class="sp-verdict block">
+        <div class="sp-verdict-dot"></div>
+        <div><div class="sp-verdict-label">SYSTEM ERROR</div><div class="sp-risk">${escapeHtml(data.risk_level || 'ERROR')}</div></div>
+        <div class="sp-score-big">--%</div>
+      </div>
+      <div class="sp-section">
+        <div class="status-box status-box--fail">
+          <div class="status-box-title">⚠️ No answer was generated</div>
+          <div class="status-box-detail">${escapeHtml(data.observability.message || data.interpretation || 'The LLM inference call failed or timed out.')} There are no quality/retrieval metrics to show below, since there is no real answer to score — resend the question once the underlying issue is resolved.</div>
+        </div>
+      </div>`;
+    contentBody.innerHTML = html;
+    return;
+  }
+
   if (activePanelTab === 'metrics') {
     // Real ragas/deepeval (via the Python eval_service) arrive asynchronously after the
     // chat answer — until then, fall back to the Node-computed NLI/embedding approximation
@@ -568,19 +729,132 @@ function renderTabContent(data) {
 
     const ragasReady = realEval && realEval.status === 'ready' && realEval.ragas;
     const deepevalReady = realEval && realEval.status === 'ready' && realEval.deepeval;
-    const ragasFaithfulnessPct = Math.round((ragasReady ? realEval.ragas.faithfulness : (data.observability?.ragas?.faithfulness || 0)) * 100);
-    const ragasRelevancePct = Math.round((ragasReady ? realEval.ragas.answer_relevancy : (data.observability?.ragas?.answer_relevance || 0)) * 100);
-    const deepevalHallucinationPct = Math.round((deepevalReady ? realEval.deepeval.hallucination : (data.observability?.deepeval?.hallucination_score || 0)) * 100);
+    // null here means the real metric genuinely failed to compute (e.g. ragas
+    // AnswerRelevancy needs Ollama embeddings even when the judge LLM is Claude, and
+    // Ollama isn't always running) — that must render as "unavailable", NOT as 0%,
+    // which would misreport a computation failure as "this answer scored zero."
+    const ragasFaithfulnessPct = ragasReady
+      ? (realEval.ragas.faithfulness != null ? Math.round(realEval.ragas.faithfulness * 100) : null)
+      : Math.round((data.observability?.ragas?.faithfulness || 0) * 100);
+    const ragasRelevancePct = ragasReady
+      ? (realEval.ragas.answer_relevancy != null ? Math.round(realEval.ragas.answer_relevancy * 100) : null)
+      : Math.round((data.observability?.ragas?.answer_relevance || 0) * 100);
+    const deepevalHallucinationPct = deepevalReady
+      ? (realEval.deepeval.hallucination != null ? Math.round(realEval.deepeval.hallucination * 100) : null)
+      : Math.round((data.observability?.deepeval?.hallucination_score || 0) * 100);
     // Reference-free retrieval-quality metrics — no Node-side approximation exists for
     // these (unlike the ones above), so there's nothing to show until the real eval lands.
     const ragasContextPrecisionPct = (ragasReady && realEval.ragas.context_precision != null) ? Math.round(realEval.ragas.context_precision * 100) : null;
     const deepevalContextualRelevancyPct = (deepevalReady && realEval.deepeval.contextual_relevancy != null) ? Math.round(realEval.deepeval.contextual_relevancy * 100) : null;
-    const ragasEvidenceText = ragasReady
-      ? `Real ragas library output (via local Ollama):\nFaithfulness = ${ragasFaithfulnessPct}%\nAnswer Relevancy = ${ragasRelevancePct}%`
-      : (data.observability?.ragas?.evidence || "No RAGAS evaluation statements extracted.");
-    const deepevalEvidenceText = deepevalReady
-      ? `Real deepeval library output (via local Ollama):\nFaithfulness = ${Math.round(realEval.deepeval.faithfulness * 100)}%\nReason: ${realEval.deepeval.faithfulness_reason || 'n/a'}\n\nHallucination = ${deepevalHallucinationPct}%\nReason: ${realEval.deepeval.hallucination_reason || 'n/a'}`
-      : (data.observability?.deepeval?.evidence || "No DeepEval context tracking traces recorded.");
+    // Hit Rate / MRR: LLM-judged reference-free proxies derived server-side from
+    // DeepEval's own per-chunk relevancy verdicts (see eval_service/app.py) — not native
+    // ragas/deepeval metrics, and not ground-truth-verified against a labeled dataset.
+    const deepevalHitRate = (deepevalReady && realEval.deepeval.hit_rate != null) ? realEval.deepeval.hit_rate : null;
+    const deepevalMrr = (deepevalReady && realEval.deepeval.mrr != null) ? realEval.deepeval.mrr : null;
+    // Instant Node-side embedding heuristic — NOT ragas/deepeval, NOT ground-truth-verified
+    // Context Recall, just a query-vs-whole-context cosine similarity available immediately.
+    const queryContextSimilarityPct = Math.round((data.observability?.local_proxy?.query_context_similarity || 0) * 100);
+    // Formats a nullable percent for display text — null means the metric genuinely
+    // failed to compute (see the ragasFaithfulnessPct/ragasRelevancePct comment above),
+    // not that it scored zero.
+    const fmtPct = v => v != null ? v + '%' : 'N/A (failed to compute — see note below)';
+    // Per-metric "how is this calculated" collapsibles — each one states the general
+    // method once (accurate documentation, not a fake number) and then appends whatever
+    // REAL data is actually available for this specific response (a genuine reason string
+    // from ragas/deepeval, the fast local-approximation evidence text, or an honest
+    // "pending"/"failed to compute" note) — never a fabricated or hardcoded score.
+    // Structured explanation block: `formula` is the general (static, accurate) method
+    // description; `resultLines` are 0+ paragraphs of REAL dynamic data for this specific
+    // response (never fabricated — pulled from real reason strings / evidence text already
+    // computed above); `items` renders as a real bullet list (claims, judge votes, symbolic
+    // rules, etc.) instead of manually joined text.
+    const howBlock = ({ formula, resultLines = [], items = [] }) => {
+      const resultHtml = resultLines.filter(Boolean).map(line =>
+        `<div class="how-result">${escapeHtml(line)}</div>`).join('');
+      const itemsHtml = items.length
+        ? `<ul class="how-list">${items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`
+        : '';
+      return `<button class="sbar-detail-toggle" onclick="toggleEvidenceContainer(this)">▶ How is this calculated?</button>
+        <div class="sbar-extra">
+          <div class="how-block">
+            <div><span class="how-label">Formula</span><div class="how-formula">${escapeHtml(formula)}</div></div>
+            ${resultHtml}
+            ${itemsHtml}
+          </div>
+        </div>`;
+    };
+
+    const ragasFaithfulnessHow = howBlock({
+      formula: 'Answer vs. Context — ragas\'s Faithfulness metric (judged by Claude) breaks the answer into individual factual claims, then checks each one against the retrieved context. Score = (# claims supported by the context) ÷ (total # claims extracted).',
+      resultLines: ragasReady
+        ? [ragasFaithfulnessPct != null
+            ? `This response scored ${ragasFaithfulnessPct}%. ragas doesn't expose the individual claim-by-claim verdicts through this integration — only the final aggregate score is available.`
+            : 'This metric failed to compute for this response — no score was produced (see the N/A note on the tile), not a real 0%.']
+        : ['Real ragas evaluation is still pending — showing the instant local approximation instead:', data.observability?.ragas?.evidence || 'No local approximation evidence recorded.'],
+    });
+    const ragasRelevanceHow = howBlock({
+      formula: 'Answer vs. Query — ragas\'s AnswerRelevancy metric asks an LLM to generate several hypothetical questions that this answer would be a good response to, then measures (via embedding cosine similarity) how closely those generated questions match the question actually asked. Higher similarity = the answer more directly addresses what was asked.',
+      resultLines: ragasReady
+        ? [ragasRelevancePct != null
+            ? `This response scored ${ragasRelevancePct}%.`
+            : 'This metric failed to compute for this response — ragas AnswerRelevancy always needs a working embedding model; when that step errors, the score comes back empty rather than a fake 0%.']
+        : ['Real ragas evaluation is still pending — showing the instant local approximation instead:', data.observability?.ragas?.evidence || 'No local approximation evidence recorded.'],
+    });
+    const deepevalHallucinationHow = howBlock({
+      formula: 'Answer vs. Context (inverse) — derived as (1 − Faithfulness) rather than measured independently. DeepEval\'s own dedicated HallucinationMetric was tested and found unreliable for this RAG shape (it scored a correct refusal as 100% hallucinated in earlier testing), so Faithfulness\'s inverse is used instead as a more trustworthy signal, at the cost of no longer being a fully independent second check.',
+      resultLines: deepevalReady
+        ? [`This response scored ${fmtPct(deepevalHallucinationPct)}.`, `Underlying Faithfulness reason: ${realEval.deepeval.faithfulness_reason || 'n/a'}`]
+        : ['Real deepeval evaluation is still pending — showing the instant local approximation instead:', data.observability?.deepeval?.evidence || 'No local approximation evidence recorded.'],
+    });
+    const queryContextSimilarityHow = howBlock({
+      formula: 'Query vs. Retrieved Context — computed instantly and locally: converts the question and the ENTIRE retrieved context (all chunks, treated as one block) into embedding vectors, then computes their cosine similarity. No LLM call, no per-chunk breakdown — just one global similarity number, available before the real evaluation even starts.',
+      resultLines: [data.observability?.local_proxy?.evidence || 'No local proxy evidence recorded.'],
+    });
+    const ragasContextPrecisionHow = howBlock({
+      formula: 'ragas\'s LLMContextPrecisionWithoutReference metric — an LLM judges EACH individually retrieved chunk (one LLM call per chunk) for whether it was actually useful for producing this answer, then computes a rank-weighted average precision (chunks judged useful earlier in the retrieval order count for more than ones judged useful later).',
+      resultLines: [ragasContextPrecisionPct != null
+        ? `This response scored ${ragasContextPrecisionPct}%. ragas doesn't expose the individual per-chunk verdicts through this integration — only the final aggregate score.`
+        : 'Pending — this metric only comes from the real ragas evaluation; there is no instant local approximation for it.'],
+    });
+    const deepevalContextualRelevancyHow = howBlock({
+      formula: 'DeepEval extracts individual factual statements out of each retrieved chunk, then an LLM judges whether each statement is relevant to the question. Score = (# statements judged relevant) ÷ (total # statements across all retrieved chunks).',
+      resultLines: [deepevalContextualRelevancyPct != null
+        ? `This response scored ${deepevalContextualRelevancyPct}%.`
+        : 'Pending — this metric only comes from the real deepeval evaluation; there is no instant local approximation for it.',
+        deepevalContextualRelevancyPct != null ? `Reason: ${realEval.deepeval.contextual_relevancy_reason || 'n/a'}` : ''],
+    });
+    const hitRateHow = howBlock({
+      formula: 'Derived from Contextual Relevancy\'s own per-chunk judgments above, at zero extra LLM-call cost — Yes if ANY retrieved chunk had at least one statement judged relevant, No if none did.',
+      resultLines: [deepevalHitRate != null
+        ? `This response: ${deepevalHitRate === 1 ? 'Yes' : 'No'}.`
+        : 'Pending — derived from the real deepeval evaluation once it completes.',
+        deepevalHitRate != null ? (realEval.deepeval.retrieval_rank_reason || '') : ''],
+    });
+    const mrrHow = howBlock({
+      formula: '1 ÷ (rank position of the first chunk that had a relevant statement, from the same per-chunk judgments Hit Rate uses). Rank #1 is best — it means the most relevant-looking chunk was retrieved first. For compound "X and Y" questions, the merged chunk list is a concatenation of independently-ranked sub-query results, not one single globally-ranked list — so "rank" reflects retrieval-batch order in that case, not one unified ranking.',
+      resultLines: [deepevalMrr != null
+        ? `This response: ${deepevalMrr > 0 ? 'Rank #' + Math.round(1 / deepevalMrr) : 'No relevant chunk found'} (MRR = ${deepevalMrr}).`
+        : 'Pending — derived from the real deepeval evaluation once it completes.',
+        deepevalMrr != null ? (realEval.deepeval.retrieval_rank_reason || '') : ''],
+    });
+
+    // Guardrail ensemble scorers — these run synchronously as part of every chat response
+    // (unlike the async ragas/deepeval eval above), so there's no "pending" state: sd is
+    // always populated except on a system error, which already returned earlier above.
+    const sd = data.scorer_detail || {};
+    const pct = v => v != null ? Math.round(v * 100) + '%' : '—';
+
+    const llmJudgeHow = howBlock({
+      formula: 'Up to 2 independent LLMs (Anthropic, Together) are each asked to vote correct / partial / incorrect on this same answer, independently. Confidence = mean of the votes (correct=1.0, partial=0.5, incorrect=0.0).',
+      resultLines: !sd.llm_judge
+        ? ['No scorer data available for this response.']
+        : sd.llm_judge.judge_count > 0
+          ? [`${sd.llm_judge.judge_count} judge(s) responded:`]
+          : ['No judge providers responded this time (missing API keys, or every provider call failed) — confidence defaulted to a neutral 0.5.'],
+      items: sd.llm_judge?.judge_count > 0
+        ? sd.llm_judge.judges.map(j => `${j.judge} — voted "${j.verdict}": ${j.rationale}`)
+        : [],
+    });
 
     html += `
       <div class="sp-verdict ${vc}">
@@ -596,17 +870,16 @@ function renderTabContent(data) {
         const mc = realEval?.masking_check;
         const mcErr = realEval?.masking_check_error;
         if (!realEval || realEval.status !== 'ready') {
-          return `<div class="sp-section" style="padding:10px 14px; margin-bottom:12px; background:rgba(0,0,0,0.15); border-radius:8px; border:1px solid var(--border-color); font-size:11.5px; color:var(--muted);">🔒 Masking check: pending real-eval result…</div>`;
+          return `<div class="sp-section"><div class="status-box status-box--pending">🔒 Masking check: pending real-eval result…</div></div>`;
         }
         if (mcErr || !mc) {
-          return `<div class="sp-section" style="padding:10px 14px; margin-bottom:12px; background:rgba(244,162,97,0.08); border:1px solid rgba(244,162,97,0.3); border-radius:8px; font-size:11.5px; color:var(--amber);">🔒 Masking check unavailable: ${escapeHtml(mcErr || 'no result')}</div>`;
+          return `<div class="sp-section"><div class="status-box status-box--unavailable">🔒 Masking check unavailable: ${escapeHtml(mcErr || 'no result')}</div></div>`;
         }
-        const passColor = mc.passed ? 'var(--pass)' : 'var(--coral)';
-        const passBg = mc.passed ? 'rgba(2,195,154,0.08)' : 'rgba(244,67,54,0.08)';
-        return `<div class="sp-section" style="padding:12px 14px; margin-bottom:12px; background:${passBg}; border:1px solid ${passColor}; border-radius:8px;">
-          <div style="font-weight:700; color:${passColor}; font-size:13px; margin-bottom:4px;">🔒 Masking Check: ${mc.passed ? 'PASS' : 'FAIL — possible leak'}</div>
-          <div style="font-size:11.5px; color:var(--gray); line-height:1.5;">${escapeHtml(mc.reason || '')}</div>
-        </div>`;
+        const passClass = mc.passed ? 'status-box--pass' : 'status-box--fail';
+        return `<div class="sp-section"><div class="status-box status-box--result ${passClass}">
+          <div class="status-box-title">🔒 Masking Check: ${mc.passed ? 'PASS' : 'FAIL — possible leak'}</div>
+          <div class="status-box-detail">${escapeHtml(mc.reason || '')}</div>
+        </div></div>`;
       })()}
 
       <div class="latency-row" style="margin-top:-12px; margin-bottom: 16px;">
@@ -619,39 +892,88 @@ function renderTabContent(data) {
         <div class="sp-section-title" style="color:var(--teal);">📈 Core Quality Metrics</div>
         ${realEvalStatusHtml}
         <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; font-size:12px; margin-bottom:12px;">
-          <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
+          <div class="metric-tile">
             <div style="color:var(--mint); font-weight:700; margin-bottom:4px;">RAGAS Faithfulness</div>
-            <div style="font-size:18px; font-weight:800; color:var(--mint);">${ragasFaithfulnessPct}%</div>
+            <div style="font-size:18px; font-weight:800; color:var(--mint);">${ragasFaithfulnessPct != null ? ragasFaithfulnessPct + '%' : '—'}</div>
             <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">Answer vs. Context — "Is the LLM's final answer 100% grounded in and supported by the retrieved PDF chunks?"</div>
+            ${ragasFaithfulnessPct == null ? `<div style="font-size:9px; color:var(--amber); margin-top:4px; opacity:0.9;">(Failed to compute — see explanation below, not a real 0%)</div>` : ''}
+            ${ragasFaithfulnessHow}
           </div>
-          <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
+          <div class="metric-tile">
             <div style="color:var(--teal); font-weight:700; margin-bottom:4px;">RAGAS Answer Relevance</div>
-            <div style="font-size:18px; font-weight:800; color:var(--teal);">${ragasRelevancePct}%</div>
+            <div style="font-size:18px; font-weight:800; color:var(--teal);">${ragasRelevancePct != null ? ragasRelevancePct + '%' : '—'}</div>
             <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">Answer vs. Query — "Did the LLM directly resolve what the user actually asked, or did it drift off-topic?"</div>
+            ${ragasRelevancePct == null ? `<div style="font-size:9px; color:var(--amber); margin-top:4px; opacity:0.9;">(Failed to compute — needs a working embedding model, not a real 0%)</div>` : ''}
+            ${ragasRelevanceHow}
           </div>
-          <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
-            <div style="color:var(--amber); font-weight:700; margin-bottom:4px;">DeepEval Context Recall</div>
-            <div style="font-size:18px; font-weight:800; color:var(--amber);">${Math.round((data.observability?.ragas?.context_recall || 0)*100)}%</div>
-            <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">Context vs. Source PDF — "Did the vector search engine fetch the right background textbook pages to begin with?"</div>
-            <div style="font-size:9px; color:var(--muted); margin-top:4px; opacity:0.75;">(Approximate local proxy — not a ground-truth-verified score)</div>
-          </div>
-          <div style="background:rgba(0,0,0,0.15); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
+          <div class="metric-tile" style="grid-column: span 2;">
             <div style="color:var(--coral); font-weight:700; margin-bottom:4px;">DeepEval Hallucination Index</div>
-            <div style="font-size:18px; font-weight:800; color:var(--coral);">${deepevalHallucinationPct}%</div>
+            <div style="font-size:18px; font-weight:800; color:var(--coral);">${deepevalHallucinationPct != null ? deepevalHallucinationPct + '%' : '—'}</div>
             <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">Answer vs. Context (Inverse) — "What exact percentage of sentences generated by the AI contains fabrications or contradictions?"</div>
+            ${deepevalHallucinationPct == null ? `<div style="font-size:9px; color:var(--amber); margin-top:4px; opacity:0.9;">(Failed to compute — see explanation below, not a real 0%)</div>` : ''}
+            ${deepevalHallucinationHow}
           </div>
         </div>
-        <button class="sbar-detail-toggle" onclick="toggleEvidenceContainer(this)">▶ Show RAGAS Clarity &amp; Evidence Trace</button>
-        <div class="sbar-extra" style="white-space: pre-wrap; font-family: sans-serif; font-size: 12px; padding:14px; background:rgba(2,195,154,0.03); border:1px dashed rgba(2,195,154,0.2); line-height:1.6; color:var(--gray);">${escapeHtml(ragasEvidenceText)}</div>
-        <button class="sbar-detail-toggle" onclick="toggleEvidenceContainer(this)">▶ Show DeepEval Clarity &amp; Evidence Trace</button>
-        <div class="sbar-extra" style="white-space: pre-wrap; font-family: sans-serif; font-size: 12px; padding:14px; background:rgba(244,162,97,0.03); border:1px dashed rgba(244,162,97,0.2); line-height:1.6; color:var(--gray);">${escapeHtml(deepevalEvidenceText)}</div>
+      </div>
+
+      <div class="sp-section" style="padding-bottom:12px;">
+        <div class="sp-section-title" style="color:var(--teal);">🔍 Retrieval Quality</div>
+        <div style="font-size:10px; color:var(--muted); margin:-8px 0 12px; line-height:1.4;">Did retrieval find the right chunks for this question? Context Precision / Contextual Relevancy / Hit Rate / MRR are reference-free LLM judgments, not ground-truth-verified — no labeled "correct chunk" dataset exists to check them against.</div>
+        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; font-size:12px;">
+          <div class="metric-tile">
+            <div style="color:var(--amber); font-weight:700; margin-bottom:4px;">Query-Context Similarity</div>
+            <div style="font-size:18px; font-weight:800; color:var(--amber);">${queryContextSimilarityPct}%</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">Query vs. Retrieved Context — instant embedding similarity between the question and the whole retrieved context blob.</div>
+            <div style="font-size:9px; color:var(--muted); margin-top:4px; opacity:0.75;">(Instant local proxy — not ground-truth-verified)</div>
+            ${queryContextSimilarityHow}
+          </div>
+          <div class="metric-tile">
+            <div style="color:var(--mint); font-weight:700; margin-bottom:4px;">RAGAS Context Precision</div>
+            <div style="font-size:18px; font-weight:800; color:var(--mint);">${ragasContextPrecisionPct != null ? ragasContextPrecisionPct + '%' : '—'}</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">What fraction of the retrieved chunks were actually useful for this answer?</div>
+            ${ragasContextPrecisionHow}
+          </div>
+          <div class="metric-tile">
+            <div style="color:var(--teal); font-weight:700; margin-bottom:4px;">DeepEval Contextual Relevancy</div>
+            <div style="font-size:18px; font-weight:800; color:var(--teal);">${deepevalContextualRelevancyPct != null ? deepevalContextualRelevancyPct + '%' : '—'}</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">Are the retrieved chunks relevant to the question asked?</div>
+            ${deepevalContextualRelevancyHow}
+          </div>
+          <div class="metric-tile">
+            <div style="color:var(--indigo); font-weight:700; margin-bottom:4px;">Hit Rate</div>
+            <div style="font-size:18px; font-weight:800; color:var(--indigo);">${deepevalHitRate != null ? (deepevalHitRate === 1 ? 'Yes' : 'No') : '—'}</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">Did at least one retrieved chunk get judged relevant?</div>
+            <div style="font-size:9px; color:var(--muted); margin-top:4px; opacity:0.75;">(LLM-judged proxy — no labeled dataset)</div>
+            ${hitRateHow}
+          </div>
+          <div class="metric-tile" style="grid-column: span 2;">
+            <div style="color:var(--indigo); font-weight:700; margin-bottom:4px;">Mean Reciprocal Rank</div>
+            <div style="font-size:18px; font-weight:800; color:var(--indigo);">${deepevalMrr != null ? (deepevalMrr > 0 ? 'Rank #' + Math.round(1/deepevalMrr) : 'No relevant chunk') : '—'}</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">How high up the retrieved list was the first relevant chunk? For compound "X and Y" questions, rank reflects retrieval-batch order (sub-queries concatenated), not one unified ranking.</div>
+            <div style="font-size:9px; color:var(--muted); margin-top:4px; opacity:0.75;">(LLM-judged proxy — no labeled dataset)</div>
+            ${mrrHow}
+          </div>
+        </div>
+      </div>
+
+      <div class="sp-section" style="padding-bottom:12px;">
+        <div class="sp-section-title" style="color:var(--teal);">🛡️ Guardrail Scorer Breakdown</div>
+        <div style="font-size:10px; color:var(--muted); margin:-8px 0 12px; line-height:1.4;">This is one of 6 scorers that combine into the single PASS/WARN/BLOCK verdict at the top of this panel — the real per-scorer detail behind that one number.</div>
+        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; font-size:12px;">
+          <div class="metric-tile" style="grid-column: span 2;">
+            <div style="color:var(--indigo); font-weight:700; margin-bottom:4px;">LLM-as-Judge</div>
+            <div style="font-size:18px; font-weight:800; color:var(--indigo);">${pct(sd.llm_judge?.confidence)}</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">${sd.llm_judge?.judge_count || 0} of up to 2 providers (Anthropic/Together) voted on this answer's correctness.</div>
+            ${llmJudgeHow}
+          </div>
+        </div>
       </div>`;
   } else if (activePanelTab === 'playarea') {
     const params = data.search_parameters || {};
     html += `
       <div class="sp-section" style="padding-top: 24px;">
         <div class="sp-section-title">Active Playarea Trace Details</div>
-        <div style="font-size: 12.5px; background: rgba(0,0,0,0.2); padding: 14px; border-radius: 8px; border: 1px solid var(--border-color); color: var(--gray); display: flex; flex-direction: column; gap: 8px;">
+        <div class="trace-box">
           <div><strong>Bi-Encoder Windows Scanned:</strong> ${params.bi_encoder_top_k_fetched || 0} blocks</div>
           <div><strong>Cross-Encoder Nodes Kept:</strong> ${params.cross_encoder_top_n_returned || 0} chunks</div>
           <div><strong>Similarity Route Metric:</strong> ${escapeHtml(params.distance_metric || 'cosine')}</div>
@@ -659,7 +981,7 @@ function renderTabContent(data) {
       </div>
       <div class="sp-section">
         <div class="sp-section-title">Retrieved Knowledge base chunks</div>
-        <div style="font-size: 13px; background: rgba(12, 184, 170, 0.03); border: 1px dashed rgba(12, 184, 170, 0.2); padding: 16px; border-radius: 8px; max-height: 400px; overflow-y: auto; color: var(--light); white-space: pre-wrap; font-family: monospace;">${escapeHtml(data.retrieved_chunks || "No reference context fragments compiled.")}</div>
+        <div class="retrieved-chunks-box">${escapeHtml(data.retrieved_chunks || "No reference context fragments compiled.")}</div>
       </div>`;
   } else {
     renderLibraryViewHTML();
@@ -672,7 +994,7 @@ function renderTabContent(data) {
       <div class="sp-section" style="padding-top: 24px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
           <div class="sp-section-title" style="margin:0; padding:0; border:none;">Ingested Knowledge /source Folder</div>
-          <button onclick="clearVectorDB()" style="background:rgba(255,92,108,0.1); border:1px solid rgba(255,92,108,0.2); color:var(--coral); font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; cursor:pointer;">Wipe All Collection Documents</button>
+          <button onclick="clearVectorDB()" class="btn-danger">Wipe All Collection Documents</button>
         </div>
         <div id="library-docs-list-container">`;
         
@@ -698,6 +1020,7 @@ function renderTabContent(data) {
 }
 function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'); }
 
+applyTheme(document.documentElement.getAttribute('data-theme'));
 refreshActiveTray();
 </script>
 </body>
