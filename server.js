@@ -144,7 +144,7 @@ async function initVectorDatabase() {
     console.log('[PII Engine] Loading NER model for dynamic name detection ("Xenova/bert-base-NER")...');
     nerPipeline = await pipeline('token-classification', 'Xenova/bert-base-NER');
 
-    chromaClient = new ChromaClient({ host: "localhost", port: 8000 });
+    chromaClient = new ChromaClient({ host: "localhost", port: 8001 });
     chromaCollection = await chromaClient.getOrCreateCollection({
       name: "Cisco_Mask_Data",
       metadata: { "hnsw:space": "cosine" },
@@ -986,13 +986,13 @@ app.get('/api/files', (req, res) => res.json(trackIndexedFiles));
 // ── 💡 SELF-HEALING ENGINE: LIVE DATABASE WIPE AND ON-THE-FLY RE-INITIALIZATION ──
 app.delete('/api/files', async (req, res) => {
   if (!chromaReady || !chromaCollection) {
-    console.log('[System Recovery] Connection warning. Attempting hot-reconnection to Chroma at port 8000...');
+    console.log('[System Recovery] Connection warning. Attempting hot-reconnection to Chroma at port 8001...');
     try {
-      chromaClient = new ChromaClient({ host: "localhost", port: 8000 });
+      chromaClient = new ChromaClient({ host: "localhost", port: 8001 });
       chromaCollection = await chromaClient.getCollection({ name: "Cisco_Mask_Data" });
       chromaReady = true;
     } catch (err) {
-      return res.status(503).json({ error: "Vector Engine completely unreachable. Please check port 8000 terminal." });
+      return res.status(503).json({ error: "Vector Engine completely unreachable. Please check port 8001 terminal." });
     }
   }
 
