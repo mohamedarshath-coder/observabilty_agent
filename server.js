@@ -42,7 +42,6 @@ const agent = new https.Agent({
 const app = express();
 const PORT = process.env.PORT || 3001;
 const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY;
-console.log(`[Diag] TOGETHER_API_KEY length=${TOGETHER_API_KEY ? TOGETHER_API_KEY.length : 'undefined'} (expected 64)`);
 
 // Disabled per explicit request — was flagging real dollar amounts and person names as
 // [REDACTED ...] before showing an answer. Kept as a flag (not deleted) so it's a one-line
