@@ -4,6 +4,14 @@ command:
   - "set -e; python3 -c \"import urllib.request as u; u.urlretrieve('https://bootstrap.pypa.io/get-pip.py','/tmp/get-pip.py')\"; python3 /tmp/get-pip.py --quiet; python3 -m pip install --no-cache-dir chromadb -r eval_service/requirements.txt; ( \"$HOME/.local/bin/chroma\" run --host 127.0.0.1 --port 8001 --path ./chroma_data ) & ( cd eval_service && python3 -m uvicorn app:app --host 0.0.0.0 --port 8500 ) & export EMBEDDING_MODEL_PATH=\"$(pwd)/Sentance_Transformer\"; exec env PORT=$DATABRICKS_APP_PORT node -r ./instrumentation.js server.js"
 
 env:
+  - name: TOGETHER_API_KEY
+    valueFrom: together_api_key
+  - name: ANTHROPIC_API_KEY
+    valueFrom: anthropic_api_key
+  - name: LANGFUSE_PUBLIC_KEY
+    valueFrom: langfuse_public_key
+  - name: LANGFUSE_SECRET_KEY
+    valueFrom: langfuse_secret_key
   - name: LANGFUSE_BASE_URL
     value: "https://cloud.langfuse.com"
   - name: ANTHROPIC_JUDGE_MODEL
