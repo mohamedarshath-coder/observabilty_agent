@@ -3,37 +3,15 @@ command:
   - -c
   - "set -e; python3 -c \"import urllib.request as u; u.urlretrieve('https://bootstrap.pypa.io/get-pip.py','/tmp/get-pip.py')\"; python3 /tmp/get-pip.py --quiet; python3 -m pip install --no-cache-dir chromadb -r eval_service/requirements.txt; ( \"$HOME/.local/bin/chroma\" run --host 127.0.0.1 --port 8001 --path ./chroma_data ) & ( cd eval_service && python3 -m uvicorn app:app --host 0.0.0.0 --port 8500 ) & export EMBEDDING_MODEL_PATH=\"$(pwd)/Sentance_Transformer\"; exec env PORT=$DATABRICKS_APP_PORT node -r ./instrumentation.js server.js"
 
-resources:
-  - name: together_api_key
-    secret:
-      scope: observability-agent
-      key: TOGETHER_API_KEY
-      permission: READ
-  - name: anthropic_api_key
-    secret:
-      scope: observability-agent
-      key: ANTHROPIC_API_KEY
-      permission: READ
-  - name: langfuse_public_key
-    secret:
-      scope: observability-agent
-      key: LANGFUSE_PUBLIC_KEY
-      permission: READ
-  - name: langfuse_secret_key
-    secret:
-      scope: observability-agent
-      key: LANGFUSE_SECRET_KEY
-      permission: READ
-
 env:
   - name: TOGETHER_API_KEY
-    valueFrom: together_api_key
+    valueFrom: observability-agent/TOGETHER_API_KEY
   - name: ANTHROPIC_API_KEY
-    valueFrom: anthropic_api_key
+    valueFrom: observability-agent/ANTHROPIC_API_KEY
   - name: LANGFUSE_PUBLIC_KEY
-    valueFrom: langfuse_public_key
+    valueFrom: observability-agent/LANGFUSE_PUBLIC_KEY
   - name: LANGFUSE_SECRET_KEY
-    valueFrom: langfuse_secret_key
+    valueFrom: observability-agent/LANGFUSE_SECRET_KEY
   - name: LANGFUSE_BASE_URL
     value: "https://cloud.langfuse.com"
   - name: ANTHROPIC_JUDGE_MODEL
