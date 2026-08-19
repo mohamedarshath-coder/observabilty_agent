@@ -1,0 +1,20 @@
+command:
+  - sh
+  - -c
+  - "set -e; python3 -m pip install --no-cache-dir chromadb -r eval_service/requirements.txt; ( chroma run --host 127.0.0.1 --port 8000 --path ./chroma_data ) & ( cd eval_service && python3 -m uvicorn app:app --host 0.0.0.0 --port 8500 ) & export EMBEDDING_MODEL_PATH=\"$(pwd)/Sentance_Transformer\"; exec env PORT=$DATABRICKS_APP_PORT node -r ./instrumentation.js server.js"
+
+env:
+  - name: TOGETHER_API_KEY
+    valueFrom: observability-agent/TOGETHER_API_KEY
+  - name: ANTHROPIC_API_KEY
+    valueFrom: observability-agent/ANTHROPIC_API_KEY
+  - name: LANGFUSE_PUBLIC_KEY
+    valueFrom: observability-agent/LANGFUSE_PUBLIC_KEY
+  - name: LANGFUSE_SECRET_KEY
+    valueFrom: observability-agent/LANGFUSE_SECRET_KEY
+  - name: LANGFUSE_BASE_URL
+    value: "https://cloud.langfuse.com"
+  - name: ANTHROPIC_JUDGE_MODEL
+    value: claude-haiku-4-5-20251001
+  - name: EVAL_SERVICE_URL
+    value: "http://localhost:8500"
