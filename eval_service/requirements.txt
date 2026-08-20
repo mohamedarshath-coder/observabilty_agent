@@ -16,3 +16,4 @@ python-dotenv>=1.0.0
 # org's Zscaler proxy for large binary downloads. See local_embeddings.py.
 onnxruntime>=1.20.0
 tokenizers>=0.20.0
+langfuse>=3.0.0

@@ -22,6 +22,7 @@ const { getDocumentProxy, extractText } = require('unpdf');
 // Local execution engine runtime environment maps
 const { env, pipeline } = require('@xenova/transformers');
 const { runGuardrailCheck } = require('./agents/coordinator');
+const { startObservation, startActiveObservation } = require('@langfuse/tracing');
 
 const modelFullPath = process.env.EMBEDDING_MODEL_PATH;
 if (!modelFullPath) {
@@ -165,6 +166,20 @@ async function getLocalEmbedding(text) {
     const output = await embeddingPipeline(text, { pooling: 'mean', normalize: true });
     return Array.from(output.data);
   } catch (err) { return null; }
+}
+
+// Real, UNTRUNCATED token count via the embedding model's own tokenizer — calling
+// .tokenizer() directly (no truncation/max_length option) runs only the WordPiece
+// tokenization step, not a full forward pass, and returns the true length even past
+// the model's own 512-token ceiling. This is what chunk sizing is measured against
+// below, instead of word count, since word count silently underestimates real token
+// count for WordPiece tokenizers and both the embedder and the reranker truncate at
+// 512 tokens regardless of how many words were fed in.
+function countTokens(text) {
+  if (!embeddingPipeline || !text || !text.trim()) return 0;
+  try {
+    return embeddingPipeline.tokenizer(text).input_ids.dims[1];
+  } catch (err) { return 0; }
 }
 
 function cosineSimilarity(a, b) {
@@ -347,20 +362,57 @@ function splitIntoSections(text) {
   return sections;
 }
 
-function fixedWindowChunkText(text, filename, chunkSize = 500, overlap = 100) {
+// Sizes each chunk by real TOKEN count instead of raw word count — both the embedding
+// model and the reranker silently truncate at 512 tokens (see countTokens above), and a
+// 500-word English chunk is typically 650-750+ WordPiece tokens, well past that ceiling.
+// targetTokens=400 leaves headroom under 512 since the reranker uses a different
+// tokenizer/vocab than the embedding model — this is a safety margin, not an exact
+// guarantee for both models. Still slices on WORD boundaries (never mid-word) so chunk
+// text stays human-readable; only the stopping point is token-aware.
+function fixedWindowChunkText(text, filename, targetTokens = 400, overlapRatio = 0.2) {
+  const WORD_STRIDE = 20; // bounds tokenizer calls per chunk to a small constant
   const sections = splitIntoSections(text);
   const chunks = [];
   let globalStart = 0;
   for (const section of sections) {
     const words = section.split(/\s+/).filter(Boolean);
     let start = 0;
+    let isFirstChunkOfSection = true;
     while (start < words.length) {
-      const end = start + chunkSize;
+      // Words are never fewer tokens than words for WordPiece tokenizers, so starting
+      // the guess at `targetTokens` words is a safe, usually-under starting point.
+      let end = Math.min(start + targetTokens, words.length);
+      let chunkText = words.slice(start, end).join(' ');
+      let tokenCount = countTokens(chunkText);
+
+      // Grow while there's room left and budget allows.
+      while (end < words.length && tokenCount < targetTokens) {
+        const nextEnd = Math.min(end + WORD_STRIDE, words.length);
+        const nextText = words.slice(start, nextEnd).join(' ');
+        const nextCount = countTokens(nextText);
+        if (nextCount > targetTokens) break;
+        end = nextEnd; chunkText = nextText; tokenCount = nextCount;
+      }
+      // Shrink if the initial guess already overshot (rare — dense/technical vocab).
+      while (tokenCount > targetTokens && end - start > WORD_STRIDE) {
+        end -= WORD_STRIDE;
+        chunkText = words.slice(start, end).join(' ');
+        tokenCount = countTokens(chunkText);
+      }
+
       const chunkWords = words.slice(start, end);
       if (chunkWords.length > 5) {
-        chunks.push({ text: chunkWords.join(' '), source: filename, startIdx: globalStart + start });
+        chunks.push({
+          text: chunkText,
+          source: filename,
+          startIdx: globalStart + start,
+          tokenCount,
+          sectionAligned: isFirstChunkOfSection,
+        });
       }
-      start += (chunkSize - overlap);
+      isFirstChunkOfSection = false;
+      const overlapWords = Math.round(chunkWords.length * overlapRatio);
+      start = Math.max(start + 1, end - overlapWords);
     }
     globalStart += words.length;
   }
@@ -375,8 +427,14 @@ function fixedWindowChunkText(text, filename, chunkSize = 500, overlap = 100) {
 // real relevance signal — batched separately, it just classifies each text alone, which is
 // meaningless for reranking. Confirmed live: this made every candidate score an identical
 // 1.0 regardless of true relevance, silently defeating the entire reranking step.
+// Returns both halves of the cutoff instead of silently discarding the losing half —
+// "kept" is what actually reaches the LLM, "cut" is everything that was scored but
+// didn't make the top-N. Surfacing "cut" lets the UI show what almost got included
+// instead of it vanishing with no trace, which is exactly what made an earlier retrieval
+// gap (a multi-part answer where only some of the relevant chunks made the cut) hard to
+// diagnose after the fact.
 async function runCrossEncoderRerank(query, chunks, topN = 3) {
-  if (!rerankerPipeline || chunks.length === 0) return chunks.slice(0, topN);
+  if (!rerankerPipeline || chunks.length === 0) return { kept: chunks.slice(0, topN), cut: chunks.slice(topN) };
   try {
     const scoredChunks = [];
     for (const chunk of chunks) {
@@ -391,10 +449,10 @@ async function runCrossEncoderRerank(query, chunks, topN = 3) {
       scoredChunks.push({ ...chunk, rerankScore: score });
     }
     scoredChunks.sort((a, b) => b.rerankScore - a.rerankScore);
-    return scoredChunks.slice(0, topN);
+    return { kept: scoredChunks.slice(0, topN), cut: scoredChunks.slice(topN) };
   } catch (err) {
     console.error('[Reranker Engine Error]:', err.message);
-    return chunks.slice(0, topN);
+    return { kept: chunks.slice(0, topN), cut: chunks.slice(topN) };
   }
 }
 
@@ -443,6 +501,7 @@ async function runRealEvalAsync(evalId, { question, answer, context, maskedAnswe
       ragas: r.data.ragas, ragas_error: r.data.ragas_error,
       deepeval: r.data.deepeval, deepeval_error: r.data.deepeval_error,
       masking_check: r.data.masking_check, masking_check_error: r.data.masking_check_error,
+      chunk_attribution: r.data.chunk_attribution, chunk_attribution_error: r.data.chunk_attribution_error,
       providers_compared: r.data.providers_compared,
     });
   } catch (err) {
@@ -603,7 +662,10 @@ app.post('/api/upload', upload.array('files', 50), async (req, res) => {
       
       textSegments.forEach((seg, i) => {
         ids.push(`${filename}-chunk-${i}-${Date.now()}-${Math.random().toString(36).slice(2,4)}`);
-        metadatas.push({ source: seg.source, chunkIndex: i });
+        metadatas.push({
+          source: seg.source, chunkIndex: i,
+          startIdx: seg.startIdx, tokenCount: seg.tokenCount, sectionAligned: seg.sectionAligned,
+        });
         documents.push(seg.text);
       });
 
@@ -626,7 +688,20 @@ app.post('/api/chat', async (req, res) => {
   let { message, context = '', session_id = 'default', model_key = 'llama3-70b-instruct', system_prompt = 'Answer factually.', is_internal = true } = req.body;
   if (!message || !message.trim()) return res.status(400).json({ error: 'message is required.' });
 
-  let rawFetchedCount = 0; let rerankedCount = 0;
+  // The whole handler runs inside one Langfuse trace — using startActiveObservation
+  // (not the plain startObservation used for the retrieval/generation spans below) means
+  // any observation created deeper in the call stack (e.g. agents/llmJudge.js's judge
+  // calls, several files away) automatically nests under this trace via OpenTelemetry's
+  // async-context propagation, with zero signature changes needed in the files between
+  // here and there.
+  return startActiveObservation('chat-turn', async (rootSpan) => {
+  // startActiveObservation's 3rd argument only controls context/observation-type options
+  // (it has no `input`/`output` fields) — attributes must be set via .update() on the
+  // returned span object instead, same as any other observation.
+  rootSpan.update({ input: { message, session_id } });
+
+  let rawFetchedCount = 0; let rerankedCount = 0; let nearMissPool = []; let retrievalCutoffGap = null;
+  let chunkDiversity = null; let sourceCoverage = null; let retrievalLatency = 0; let selectedChunksForResponse = [];
 
   // Query decomposition: a single combined query embedding for a compound question
   // ("P-side AND N-side defects", "fee for project A AND project B") dilutes the search
@@ -660,10 +735,13 @@ app.post('/api/chat', async (req, res) => {
   const retrievalQueries = subQueries.length > 1 ? subQueries : [message];
   const topNPerQuery = subQueries.length > 1 ? 3 : 5;
 
+  const retrievalStart = Date.now();
+  const retrievalSpan = rootSpan.startObservation('retrieval', { input: { queries: retrievalQueries } }, { asType: 'retriever' });
   if (is_internal && chromaReady && chromaCollection) {
     try {
       const seenChunkTexts = new Set();
       const mergedPool = [];
+      let rawNearMissPool = [];
       for (const q of retrievalQueries) {
         const queryVector = await getLocalEmbedding(q);
         if (!queryVector) continue;
@@ -681,14 +759,71 @@ app.post('/api/chat', async (req, res) => {
         // low to make top-5 regardless, while a legitimately on-topic chunk that narrowly
         // missed top-3 (e.g. a section's tail-end, split across a chunk boundary) has a
         // fair shot at inclusion instead of being silently dropped.
-        const sortedPool = await runCrossEncoderRerank(q, rawPool, topNPerQuery);
-        for (const c of sortedPool) {
+        const { kept, cut } = await runCrossEncoderRerank(q, rawPool, topNPerQuery);
+        for (const c of kept) {
           if (seenChunkTexts.has(c.text)) continue;
           seenChunkTexts.add(c.text);
           mergedPool.push(c);
         }
+        rawNearMissPool.push(...cut);
       }
       rerankedCount = mergedPool.length;
+      // Near-misses: real candidates the reranker scored but didn't make the cut in ANY
+      // sub-query — a chunk cut in one sub-query's pass but kept via another isn't a miss.
+      // This is pure transparency (what almost got shown to the LLM), not a new judged
+      // metric — no relevance label exists for these, only the reranker's own score.
+      const nearMissByText = new Map();
+      for (const c of rawNearMissPool) {
+        if (seenChunkTexts.has(c.text)) continue;
+        const existing = nearMissByText.get(c.text);
+        if (!existing || (c.rerankScore ?? 0) > (existing.rerankScore ?? 0)) nearMissByText.set(c.text, c);
+      }
+      nearMissPool = [...nearMissByText.values()].sort((a, b) => (b.rerankScore ?? 0) - (a.rerankScore ?? 0));
+      // How close was the cutoff? Lowest score actually sent to the LLM minus the highest
+      // score among what got left out — a small/negative gap means a near-miss chunk
+      // scored almost as well (or better, if a later sub-query's cut candidate outscored
+      // an earlier sub-query's kept one) as something that made the cut, i.e. a risky
+      // cutoff; a large gap means the kept chunks were a confident, clear-cut selection.
+      // null (not 0) whenever either side lacks a real score, e.g. the reranker fell back.
+      const keptScores = mergedPool.map(c => c.rerankScore).filter(s => s != null);
+      const cutScores = nearMissPool.map(c => c.rerankScore).filter(s => s != null);
+      retrievalCutoffGap = (keptScores.length > 0 && cutScores.length > 0)
+        ? parseFloat((Math.min(...keptScores) - Math.max(...cutScores)).toFixed(4))
+        : null;
+      selectedChunksForResponse = mergedPool.map(c => ({
+        source: c.source,
+        rerank_score: c.rerankScore != null ? parseFloat(c.rerankScore.toFixed(4)) : null,
+        text: c.text,
+      }));
+
+      // Chunk Diversity: mean pairwise cosine DISTANCE among the selected chunks'
+      // embeddings (Intra-List Average Distance) — are these genuinely different pieces
+      // of information, or near-duplicates padding the context? Reuses the same local
+      // embedding model already used for retrieval itself; no new model, no LLM call.
+      // Undefined (null) with fewer than 2 chunks — there's no pair to compare.
+      if (mergedPool.length >= 2) {
+        const chunkVectors = await Promise.all(mergedPool.map(c => getLocalEmbedding(c.text)));
+        const validVectors = chunkVectors.filter(v => v != null);
+        if (validVectors.length >= 2) {
+          let totalDistance = 0, pairCount = 0;
+          for (let i = 0; i < validVectors.length; i++) {
+            for (let j = i + 1; j < validVectors.length; j++) {
+              totalDistance += 1 - cosineSimilarity(validVectors[i], validVectors[j]);
+              pairCount++;
+            }
+          }
+          chunkDiversity = pairCount > 0 ? parseFloat((totalDistance / pairCount).toFixed(4)) : null;
+        }
+      }
+
+      // Source Coverage: how many distinct documents did the selected chunks actually
+      // come from — flags over-reliance on a single document for a question that might
+      // need information spread across several. Pure counting, no computation cost.
+      if (mergedPool.length > 0) {
+        const distinctSources = [...new Set(mergedPool.map(c => c.source))];
+        sourceCoverage = { distinct_sources: distinctSources.length, total_chunks: mergedPool.length, sources: distinctSources };
+      }
+
       if (mergedPool.length > 0) {
         // c.rerankScore is missing whenever runCrossEncoderRerank fell back (reranker
         // unavailable/errored) — format explicitly as 'n/a' instead of the literal
@@ -698,6 +833,12 @@ app.post('/api/chat', async (req, res) => {
       }
     } catch (err) { console.error(err); }
   }
+  retrievalLatency = Date.now() - retrievalStart;
+  retrievalSpan.update({
+    output: { selected_chunks: selectedChunksForResponse.map(c => ({ source: c.source, rerank_score: c.rerank_score })), source_coverage: sourceCoverage },
+    metadata: { chunk_diversity: chunkDiversity, retrieval_cutoff_gap: retrievalCutoffGap, reranked_count: rerankedCount },
+  });
+  retrievalSpan.end();
 
   if (!sessions[session_id]) sessions[session_id] = [];
   const history = sessions[session_id];
@@ -716,8 +857,23 @@ app.post('/api/chat', async (req, res) => {
   let tokenLogprobs = [];
   let networkBlocked = false;
 
+  const TOGETHER_MODEL_NAME = 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+  let primaryGeneration = null;
+  let resampleGeneration = null;
+
   try {
     const messages = [{ role: 'system', content: system_prompt }, ...history.slice(-6), { role: 'user', content: message }];
+
+    primaryGeneration = rootSpan.startObservation(
+      'together-primary-answer',
+      { model: TOGETHER_MODEL_NAME, input: messages, modelParameters: { temperature: 0, maxTokens: 1024 } },
+      { asType: 'generation' }
+    );
+    resampleGeneration = rootSpan.startObservation(
+      'together-resample-blackbox',
+      { model: TOGETHER_MODEL_NAME, input: messages, modelParameters: { temperature: 0.9, maxTokens: 512 } },
+      { asType: 'generation' }
+    );
 
     // Fire the primary answer and an independent higher-temperature resample in parallel.
     // The resample feeds the Black Box scorer's real semantic self-consistency check
@@ -733,17 +889,36 @@ app.post('/api/chat', async (req, res) => {
         // highest-probability token) is the correct setting, not just a workaround.
         // The resample call below intentionally STAYS at 0.9 — its whole purpose is to be a
         // genuinely different sample for the black-box self-consistency check.
-        { model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', messages, max_tokens: 1024, temperature: 0, logprobs: true },
+        { model: TOGETHER_MODEL_NAME, messages, max_tokens: 1024, temperature: 0, logprobs: true },
         { headers: { Authorization: `Bearer ${TOGETHER_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 60000, httpsAgent: agent }
       ),
       axios.post('https://api.together.xyz/v1/chat/completions',
-        { model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', messages, max_tokens: 512, temperature: 0.9 },
+        { model: TOGETHER_MODEL_NAME, messages, max_tokens: 512, temperature: 0.9 },
         { headers: { Authorization: `Bearer ${TOGETHER_API_KEY}`, 'Content-Type': 'application/json' }, timeout: 60000, httpsAgent: agent }
       ).catch(err => { console.error('[Black Box Resample Error]:', err.message); return null; })
     ]);
 
     llmResponse = primaryResult.data.choices?.[0]?.message?.content?.trim() || '';
     secondSampleText = resampleResult?.data?.choices?.[0]?.message?.content?.trim() || '';
+
+    primaryGeneration.update({
+      output: llmResponse,
+      usageDetails: primaryResult.data.usage ? {
+        promptTokens: primaryResult.data.usage.prompt_tokens,
+        completionTokens: primaryResult.data.usage.completion_tokens,
+        totalTokens: primaryResult.data.usage.total_tokens,
+      } : undefined,
+    });
+    primaryGeneration.end();
+    resampleGeneration.update({
+      output: secondSampleText,
+      usageDetails: resampleResult?.data?.usage ? {
+        promptTokens: resampleResult.data.usage.prompt_tokens,
+        completionTokens: resampleResult.data.usage.completion_tokens,
+        totalTokens: resampleResult.data.usage.total_tokens,
+      } : undefined,
+    });
+    resampleGeneration.end();
 
     // Together's chat completions mirror the OpenAI logprobs shape (choices[0].logprobs.content
     // = [{token, logprob}]); fall back to the legacy completions-style parallel arrays defensively
@@ -758,6 +933,11 @@ app.post('/api/chat', async (req, res) => {
   } catch (err) {
     networkBlocked = true;
     llmResponse = `Inference timeout connection failure: ${err.message}`;
+    // primaryGeneration/resampleGeneration may be null (error thrown before creation) or
+    // already created but never resolved (error thrown during the Together calls) — guard
+    // both cases so a network failure doesn't also leave a span open forever in Langfuse.
+    if (primaryGeneration) { primaryGeneration.update({ level: 'ERROR', statusMessage: err.message }); primaryGeneration.end(); }
+    if (resampleGeneration) { resampleGeneration.update({ level: 'ERROR', statusMessage: err.message }); resampleGeneration.end(); }
   }
 
   // Snapshot the raw, pre-masking response for scorers that compare semantic content
@@ -963,13 +1143,31 @@ app.post('/api/chat', async (req, res) => {
     interpretation = 'Financial and PII metrics successfully audited via dynamic rule constraints.';
   }
 
+  rootSpan.update({ output: llmResponse });
+
   res.json({
     session_id, message, response: llmResponse, llm_latency: llmLatency, hm_latency: hmLatency,
     verdict, ensemble_score, risk_level, interpretation,
     scorers: alignedScorers, scorer_detail: scorerDetail, retrieved_chunks: context || "No context chunks retrieved.",
     search_parameters: { bi_encoder_top_k_fetched: rawFetchedCount, cross_encoder_top_n_returned: rerankedCount, distance_metric: "cosine + Cross-Encoder Rerank" },
+    // Both sides of the cutoff, so the UI can show one ranked list instead of only the
+    // rejected half — transparency, not a judged metric (no relevance label exists for
+    // either list, just the reranker's own score).
+    selected_chunks: selectedChunksForResponse,
+    near_miss_chunks: nearMissPool.slice(0, 5).map(c => ({
+      source: c.source,
+      rerank_score: c.rerankScore != null ? parseFloat(c.rerankScore.toFixed(4)) : null,
+      text: c.text,
+    })),
+    retrieval_cutoff_gap: retrievalCutoffGap,
+    // Structural/embedding signals, computed from data already produced during retrieval —
+    // no new LLM calls, available in this same instant response cycle.
+    chunk_diversity: chunkDiversity,
+    source_coverage: sourceCoverage,
+    retrieval_latency: retrievalLatency,
     observability: obsTelemetry,
     real_eval_id: realEvalId,
+  });
   });
 });
 
@@ -982,6 +1180,101 @@ app.get('/api/real-eval/:evalId', (req, res) => {
 });
 
 app.get('/api/files', (req, res) => res.json(trackIndexedFiles));
+
+// ── 🧩 Chunking-quality metrics — computed on demand from data already persisted in ──
+// Chroma (chunk text + embeddings + metadata), not a new store. Works uniformly for
+// files indexed before and after the token-budget chunking fix above, EXCEPT
+// section_alignment, which needs the `sectionAligned` metadata field only newly-ingested
+// chunks carry — legacy files report that one metric as unavailable rather than trying
+// to retroactively reconstruct section boundaries from the original file.
+const NEAR_DUPLICATE_THRESHOLD = 0.95;
+const NEAR_DUPLICATE_MAX_CHUNKS = 1000; // bounds pairwise comparison cost; see `sampled` in the response
+
+function computeSentenceBoundaryClean(text) {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return false;
+  const startsClean = /^[A-Z0-9"'“(\[]/.test(trimmed);
+  const endsClean = /[.?!"'”)\]]\s*$/.test(trimmed);
+  return startsClean && endsClean;
+}
+
+app.get('/api/chunk-quality', async (req, res) => {
+  const filename = req.query.file;
+  if (!filename) return res.status(400).json({ error: 'Missing required "file" query parameter.' });
+  if (!chromaReady || !chromaCollection) return res.status(503).json({ error: 'DB engine offline.' });
+
+  try {
+    const result = await chromaCollection.get({ where: { source: filename }, include: ['documents', 'embeddings', 'metadatas'] });
+    const documents = result.documents || [];
+    const embeddings = result.embeddings || [];
+    const metadatas = result.metadatas || [];
+    const chunkCount = documents.length;
+
+    if (chunkCount === 0) {
+      return res.json({ filename, chunk_count: 0, message: 'No indexed chunks found for this file.' });
+    }
+
+    // Token stats + overflow rate — use persisted tokenCount where available (new-format
+    // chunks, free), else retokenize on the fly (legacy chunks — cheap, no forward pass).
+    const tokenCounts = documents.map((doc, i) => {
+      const persisted = metadatas[i]?.tokenCount;
+      return (typeof persisted === 'number') ? persisted : countTokens(doc || '');
+    });
+    const HARD_TOKEN_LIMIT = 512; // the actual ceiling enforced by both the embedder and reranker
+    const avgTokens = tokenCounts.reduce((a, b) => a + b, 0) / chunkCount;
+    const overflowCount = tokenCounts.filter(c => c > HARD_TOKEN_LIMIT).length;
+
+    // Sentence-boundary completeness — pure regex, no metadata dependency.
+    const boundaryCleanCount = documents.filter(doc => computeSentenceBoundaryClean(doc)).length;
+
+    // Near-duplicate rate — pairwise cosine similarity over Chroma's own stored embeddings,
+    // present for every chunk regardless of ingest date.
+    let nearDuplicateInfo = { rate: null, sampled: false };
+    const validEmbeddings = embeddings.filter(e => Array.isArray(e) && e.length > 0);
+    if (validEmbeddings.length >= 2) {
+      const sampleSize = Math.min(validEmbeddings.length, NEAR_DUPLICATE_MAX_CHUNKS);
+      const sample = validEmbeddings.slice(0, sampleSize);
+      const hasDuplicate = new Array(sampleSize).fill(false);
+      for (let i = 0; i < sampleSize; i++) {
+        for (let j = i + 1; j < sampleSize; j++) {
+          if (cosineSimilarity(sample[i], sample[j]) > NEAR_DUPLICATE_THRESHOLD) {
+            hasDuplicate[i] = true; hasDuplicate[j] = true;
+          }
+        }
+      }
+      nearDuplicateInfo = {
+        rate: parseFloat((hasDuplicate.filter(Boolean).length / sampleSize).toFixed(4)),
+        sampled: sampleSize < validEmbeddings.length,
+        sampled_count: sampleSize,
+      };
+    }
+
+    // Section-boundary alignment — only meaningful if at least one chunk actually carries
+    // the `sectionAligned` field (i.e. was indexed after the token-budget chunking fix).
+    const hasSectionMetadata = metadatas.some(m => typeof m?.sectionAligned === 'boolean');
+    const sectionAlignment = hasSectionMetadata
+      ? { available: true, rate: parseFloat((metadatas.filter(m => m?.sectionAligned === true).length / chunkCount).toFixed(4)) }
+      : { available: false };
+
+    res.json({
+      filename,
+      chunk_count: chunkCount,
+      token_stats: {
+        avg: Math.round(avgTokens),
+        min: Math.min(...tokenCounts),
+        max: Math.max(...tokenCounts),
+        hard_limit: HARD_TOKEN_LIMIT,
+        overflow_rate: parseFloat((overflowCount / chunkCount).toFixed(4)),
+      },
+      sentence_boundary_rate: parseFloat((boundaryCleanCount / chunkCount).toFixed(4)),
+      near_duplicate: nearDuplicateInfo,
+      section_alignment: sectionAlignment,
+    });
+  } catch (err) {
+    console.error('[Chunk Quality Error]:', err.message);
+    res.status(500).json({ error: 'Failed to compute chunking-quality metrics.', detail: err.message });
+  }
+});
 
 // ── 💡 SELF-HEALING ENGINE: LIVE DATABASE WIPE AND ON-THE-FLY RE-INITIALIZATION ──
 app.delete('/api/files', async (req, res) => {

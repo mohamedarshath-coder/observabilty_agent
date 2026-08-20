@@ -1,0 +1,231 @@
+
+
+                [38;5;069m(((((((((    [38;5;203m((((([38;5;220m####
+             [38;5;069m((((((((((((([38;5;203m((((((((([38;5;220m#########
+           [38;5;069m((((((((((((([38;5;203m((((((((((([38;5;220m###########
+         [38;5;069m(((((((((((((([38;5;203m(((((((((((([38;5;220m############
+        [38;5;069m((((((((((((([38;5;203m(((((((((((((([38;5;220m#############
+        [38;5;069m((((((((((((([38;5;203m(((((((((((((([38;5;220m#############
+         [38;5;069m(((((((((((([38;5;203m((((((((((((([38;5;220m##############
+         [38;5;069m(((((((((((([38;5;203m(((((((((((([38;5;220m##############
+           [38;5;069m(((((((((([38;5;203m((((((((((([38;5;220m#############
+             [38;5;069m(((((((([38;5;203m(((((((([38;5;220m##############
+                [38;5;069m((((([38;5;203m((((    [38;5;220m#########[0m
+
+Saving data to: ./chroma_data
+Connect to Chroma at: http://localhost:8000
+Getting started guide: https://docs.trychroma.com/docs/overview/getting-started
+
+☁️ To deploy your DB - try Chroma Cloud!
+- Sign up: https://trychroma.com/signup
+- Copy your data to Cloud: chroma copy --to-cloud --all
+
+  [2m2026-08-13T05:30:18.970838Z[0m [32m INFO[0m  [32mGlobal tracing subscriber set[0m
+    [2;3mat[0m rust\tracing\src\init_tracer.rs:370
+
+  [2m2026-08-13T05:30:19.017057Z[0m [32m INFO[0m  [32mFrontend server listening on address, [1;32maddr[0m[32m: 127.0.0.1:8000[0m
+    [2;3mat[0m rust\frontend\src\server.rs:416
+
+  [2m2026-08-13T05:30:30.399504Z[0m [32m INFO[0m  [1;32mtenant_name[0m[32m: default_tenant, [1;32mdatabase_name[0m[32m: default_database, [1;32mlimit[0m[32m: None, [1;32moffset[0m[32m: 0[0m
+    [2;3mat[0m rust\frontend\src\server.rs:1148
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: GET, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: 127.0.0.1:8000, [1mhttp.user_agent[0m: curl/8.14.1, [1motel.name[0m: "GET /api/v2/tenants/{tenant}/databases/{database}/collections"
+
+  [2m2026-08-13T05:33:13.374790Z[0m [32m INFO[0m  [1;32mtenant_name[0m[32m: default_tenant, [1;32mdatabase_name[0m[32m: default_database[0m
+    [2;3mat[0m rust\frontend\src\server.rs:1315
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections"
+
+  [2m2026-08-13T05:34:04.844424Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mcollection_add[0m
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/add, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/add", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/add"
+
+  [2m2026-08-13T05:34:04.855854Z[0m [32m INFO[0m  [1;32mtenant_name[0m[32m: default_tenant, [1;32mdatabase_name[0m[32m: default_database, [1;32mcollection_id[0m[32m: 8a20ed0e-19b6-4605-bd57-5f79e48cd995, [1;32mnum_ids[0m[32m: 20[0m
+    [2;3mat[0m rust\frontend\src\server.rs:2053
+    [2;3min[0m [1mcollection_add[0m
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/add, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/add", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/add"
+
+  [2m2026-08-13T05:34:04.857643Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mcollection_add[0m
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/add, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/add", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/add"
+
+  [2m2026-08-13T05:36:28.471326Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T05:36:28.475816Z[0m [32m INFO[0m  [1;32mnum_ids[0m[32m: 0, [1;32mnum_embeddings[0m[32m: 1, [1;32minclude[0m[32m: IncludeList([Metadata, Document, Distance]), [1;32mhas_where[0m[32m: false[0m
+    [2;3mat[0m rust\frontend\src\server.rs:3037
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T05:36:28.477393Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T05:36:28.478421Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T05:40:16.564258Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T05:40:16.566255Z[0m [32m INFO[0m  [1;32mnum_ids[0m[32m: 0, [1;32mnum_embeddings[0m[32m: 1, [1;32minclude[0m[32m: IncludeList([Metadata, Document, Distance]), [1;32mhas_where[0m[32m: false[0m
+    [2;3mat[0m rust\frontend\src\server.rs:3037
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T05:40:16.566407Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T05:40:16.567079Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T06:03:49.927287Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T06:03:49.942223Z[0m [32m INFO[0m  [1;32mnum_ids[0m[32m: 0, [1;32mnum_embeddings[0m[32m: 1, [1;32minclude[0m[32m: IncludeList([Metadata, Document, Distance]), [1;32mhas_where[0m[32m: false[0m
+    [2;3mat[0m rust\frontend\src\server.rs:3037
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T06:03:49.942467Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T06:03:49.943523Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T07:02:47.298245Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T07:02:47.316052Z[0m [32m INFO[0m  [1;32mnum_ids[0m[32m: 0, [1;32mnum_embeddings[0m[32m: 1, [1;32minclude[0m[32m: IncludeList([Metadata, Document, Distance]), [1;32mhas_where[0m[32m: false[0m
+    [2;3mat[0m rust\frontend\src\server.rs:3037
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T07:02:47.316268Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T07:02:47.317770Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T07:02:53.912005Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T07:02:53.913607Z[0m [32m INFO[0m  [1;32mnum_ids[0m[32m: 0, [1;32mnum_embeddings[0m[32m: 1, [1;32minclude[0m[32m: IncludeList([Metadata, Document, Distance]), [1;32mhas_where[0m[32m: false[0m
+    [2;3mat[0m rust\frontend\src\server.rs:3037
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T07:02:53.914587Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T07:02:53.916058Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:11:57.780060Z[0m [32m INFO[0m  [1;32mtenant_name[0m[32m: default_tenant, [1;32mdatabase_name[0m[32m: default_database[0m
+    [2;3mat[0m rust\frontend\src\server.rs:1315
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections"
+
+  [2m2026-08-13T09:12:48.156279Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:12:48.166461Z[0m [32m INFO[0m  [1;32mnum_ids[0m[32m: 0, [1;32mnum_embeddings[0m[32m: 1, [1;32minclude[0m[32m: IncludeList([Metadata, Document, Distance]), [1;32mhas_where[0m[32m: false[0m
+    [2;3mat[0m rust\frontend\src\server.rs:3037
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:12:48.167029Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:12:48.168547Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:15:27.808476Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:15:27.811863Z[0m [32m INFO[0m  [1;32mnum_ids[0m[32m: 0, [1;32mnum_embeddings[0m[32m: 1, [1;32minclude[0m[32m: IncludeList([Metadata, Document, Distance]), [1;32mhas_where[0m[32m: false[0m
+    [2;3mat[0m rust\frontend\src\server.rs:3037
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:15:27.812116Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:15:27.814066Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:31:24.994410Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:31:25.009606Z[0m [32m INFO[0m  [1;32mnum_ids[0m[32m: 0, [1;32mnum_embeddings[0m[32m: 1, [1;32minclude[0m[32m: IncludeList([Metadata, Document, Distance]), [1;32mhas_where[0m[32m: false[0m
+    [2;3mat[0m rust\frontend\src\server.rs:3037
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:31:25.009727Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:31:25.016716Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:38:50.525928Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:38:50.527168Z[0m [32m INFO[0m  [1;32mnum_ids[0m[32m: 0, [1;32mnum_embeddings[0m[32m: 1, [1;32minclude[0m[32m: IncludeList([Metadata, Document, Distance]), [1;32mhas_where[0m[32m: false[0m
+    [2;3mat[0m rust\frontend\src\server.rs:3037
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:38:50.527311Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T09:38:50.528331Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T10:01:04.329701Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T10:01:04.338531Z[0m [32m INFO[0m  [1;32mnum_ids[0m[32m: 0, [1;32mnum_embeddings[0m[32m: 1, [1;32minclude[0m[32m: IncludeList([Metadata, Document, Distance]), [1;32mhas_where[0m[32m: false[0m
+    [2;3mat[0m rust\frontend\src\server.rs:3037
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T10:01:04.338614Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T10:01:04.339090Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T10:20:18.042193Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T10:20:18.056218Z[0m [32m INFO[0m  [1;32mnum_ids[0m[32m: 0, [1;32mnum_embeddings[0m[32m: 1, [1;32minclude[0m[32m: IncludeList([Metadata, Document, Distance]), [1;32mhas_where[0m[32m: false[0m
+    [2;3mat[0m rust\frontend\src\server.rs:3037
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T10:20:18.056389Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+
+  [2m2026-08-13T10:20:18.058031Z[0m [32m INFO[0m  [32mCache miss for collection 8a20ed0e-19b6-4605-bd57-5f79e48cd995[0m
+    [2;3mat[0m rust\frontend\src\get_collection_with_segments_provider.rs:182
+    [2;3min[0m [1mHTTP request[0m [2;3mwith[0m [1mhttp.method[0m: POST, [1mhttp.uri[0m: /api/v2/tenants/default_tenant/databases/default_database/collections/8a20ed0e-19b6-4605-bd57-5f79e48cd995/query, [1mhttp.route[0m: "/api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query", [1mhttp.version[0m: HTTP/1.1, [1mhttp.host[0m: localhost:8000, [1mhttp.user_agent[0m: node, [1motel.name[0m: "POST /api/v2/tenants/{tenant}/databases/{database}/collections/{collection_id}/query"
+

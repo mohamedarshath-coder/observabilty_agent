@@ -512,6 +512,46 @@ function toggleEvidenceContainer(btn) {
   }
 }
 
+// Same open/close mechanics as toggleEvidenceContainer above, but lazily fetches
+// /api/chunk-quality the first time a given file's panel is opened (guarded by
+// dataset.loaded so re-toggling doesn't re-fetch) — these metrics are computed from
+// Chroma data on demand, not pushed with the page, so a network round-trip is needed.
+async function toggleChunkQualityPanel(btn) {
+  const container = btn.nextElementSibling;
+  if (!container) return;
+  container.classList.toggle('open');
+  const isOpen = container.classList.contains('open');
+  btn.textContent = (isOpen ? '▼ ' : '▶ ') + btn.textContent.slice(2);
+  if (!isOpen || container.dataset.loaded) return;
+
+  container.innerHTML = `<div class="how-result">Computing chunking-quality metrics…</div>`;
+  try {
+    const r = await fetch('/api/chunk-quality?file=' + encodeURIComponent(btn.dataset.filename));
+    const m = await r.json();
+    if (!r.ok) throw new Error(m.error || 'Request failed');
+    container.innerHTML = renderChunkQualityHtml(m);
+    container.dataset.loaded = '1';
+  } catch (e) {
+    container.innerHTML = `<div class="how-result">Failed to compute: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderChunkQualityHtml(m) {
+  if (!m.chunk_count) {
+    return `<div class="how-block"><div class="how-result">${escapeHtml(m.message || 'No indexed chunks found for this file.')}</div></div>`;
+  }
+  const ts = m.token_stats;
+  const nd = m.near_duplicate;
+  const sa = m.section_alignment;
+  return `<div class="how-block">
+    <div class="how-result">📏 Token size: avg ${ts.avg}, range ${ts.min}–${ts.max} (model hard limit: ${ts.hard_limit}). Overflow rate: ${Math.round(ts.overflow_rate * 100)}% of chunks exceed the limit and get silently truncated at embed/rerank time.</div>
+    <div class="how-result">✂️ Sentence-boundary completeness: ${Math.round(m.sentence_boundary_rate * 100)}% of chunks start/end on clean sentence boundaries (heuristic proxy, not exact).</div>
+    <div class="how-result">🧬 Near-duplicate rate: ${nd.rate != null ? Math.round(nd.rate * 100) + '% of chunks have a near-duplicate elsewhere in this document' : 'not enough chunks to compare'}${nd.sampled ? ` (sampled first ${nd.sampled_count} chunks)` : ''}.</div>
+    <div class="how-result">🧩 Section-boundary alignment: ${sa.available ? Math.round(sa.rate * 100) + '% of chunks begin exactly at a detected section boundary' : 'not available — re-upload this file to enable this metric'}.</div>
+    <div class="how-result" style="opacity:0.7; font-style:italic;">${m.chunk_count} chunk(s) indexed for this file. These are ingest-time structural signals, not LLM-judged — heuristic proxies like the rest of this app's metrics.</div>
+  </div>`;
+}
+
 async function uploadRAGFilesBatch(input) {
   if (!input.files || input.files.length === 0) return;
   const formData = new FormData();
@@ -754,6 +794,18 @@ function renderTabContent(data) {
     // Instant Node-side embedding heuristic — NOT ragas/deepeval, NOT ground-truth-verified
     // Context Recall, just a query-vs-whole-context cosine similarity available immediately.
     const queryContextSimilarityPct = Math.round((data.observability?.local_proxy?.query_context_similarity || 0) * 100);
+    // Structural/embedding signals computed in server.js from data already produced during
+    // retrieval — instant, no LLM call, available in this same response cycle (unlike the
+    // async ragas/deepeval metrics above).
+    const chunkDiversity = data.chunk_diversity;
+    const sourceCoverage = data.source_coverage;
+    const retrievalLatency = data.retrieval_latency;
+    // Chunk vs. ANSWER (not vs. question, like Contextual Relevancy above) — did the final
+    // answer actually draw on this specific chunk, or was it retrieved but never used?
+    // Index-aligned to data.selected_chunks (both derive from the same server.js merged
+    // chunk order), so near-miss chunks (never sent to the LLM) have no attribution entry.
+    const chunkAttribution = (realEval && realEval.status === 'ready') ? realEval.chunk_attribution : null;
+    const chunkAttributionError = (realEval && realEval.status === 'ready') ? realEval.chunk_attribution_error : null;
     // Formats a nullable percent for display text — null means the metric genuinely
     // failed to compute (see the ragasFaithfulnessPct/ragasRelevancePct comment above),
     // not that it scored zero.
@@ -837,6 +889,53 @@ function renderTabContent(data) {
         : 'Pending — derived from the real deepeval evaluation once it completes.',
         deepevalMrr != null ? (realEval.deepeval.retrieval_rank_reason || '') : ''],
     });
+    const chunkDiversityHow = howBlock({
+      formula: 'Mean pairwise cosine DISTANCE (1 − cosine similarity) among the selected chunks\' embeddings, using the same local embedding model used for retrieval itself — no LLM call. Closer to 0 means the chunks are near-duplicates of each other (padding); closer to 1 means they carry genuinely distinct information. Undefined with fewer than 2 selected chunks — there\'s no pair to compare.',
+      resultLines: [chunkDiversity != null
+        ? `This response: ${chunkDiversity} (0 = duplicate chunks, 1 = fully distinct).`
+        : 'Not applicable — fewer than 2 chunks were selected this time.'],
+    });
+    const sourceCoverageHow = howBlock({
+      formula: 'Simple count of distinct source documents among the selected chunks — not a judgment of quality, just visibility into whether the answer drew from one document or several. A question that logically spans multiple documents but pulls from only one source may be missing information, though pulling from one document is entirely correct when the answer genuinely lives in just that one place.',
+      resultLines: sourceCoverage
+        ? [`This response: ${sourceCoverage.distinct_sources} document(s) across ${sourceCoverage.total_chunks} selected chunk(s).`]
+        : ['No chunks were selected this time.'],
+      items: sourceCoverage ? sourceCoverage.sources : [],
+    });
+
+    // Not an LLM-judged metric like the others above — pure transparency. Combines BOTH
+    // halves of the reranker's output (what was kept and what was cut) into one ranked
+    // list, so the actual score gap is directly visible instead of requiring the reader
+    // to back-calculate the kept side from the gap number alone.
+    // Chunk Attribution (see const above) is index-aligned to data.selected_chunks —
+    // near-miss chunks were never sent to the LLM, so there's nothing to attribute for them.
+    const attributionChunks = chunkAttribution?.chunks || null;
+    const selectedChunks = (data.selected_chunks || []).map((c, i) => ({
+      ...c, selected: true,
+      attribution: attributionChunks ? attributionChunks[i] : null,
+    }));
+    const nearMissChunks = (data.near_miss_chunks || []).map(c => ({ ...c, selected: false }));
+    const rankedChunks = [...selectedChunks, ...nearMissChunks]
+      .sort((a, b) => (b.rerank_score ?? -1) - (a.rerank_score ?? -1));
+    const cutoffGap = data.retrieval_cutoff_gap;
+    const nearMissHow = howBlock({
+      formula: 'Retrieval is a two-stage funnel: Chroma\'s bi-encoder returns the top 10 nearest-neighbor chunks by embedding similarity, then a cross-encoder reranker re-scores all 10 by jointly reading [question, chunk] together and keeps only the top few. The list below is every candidate the reranker actually scored, ranked highest to lowest — ✓ SELECTED chunks were sent to the LLM, ✗ NOT SELECTED ones scored too low to make the cut. Score is the reranker\'s own sigmoid-normalized output (0-1) — not an LLM relevance judgment, and BAAI\'s own published guidance for this model family suggests roughly: 0-0.2 irrelevant, 0.2-0.4 low relevance, 0.4-0.6 partially relevant, 0.6-0.8 highly relevant, 0.8-1.0 a direct answer — treat these as rough bands, not an exact spec, since this project uses the smaller "base" variant rather than the model those bands were published for. "Cutoff gap" = the lowest SELECTED score minus the highest NOT SELECTED score — a small or negative gap means a rejected chunk scored almost as well as (or better than) something that was kept, i.e. a risky cutoff.',
+      resultLines: [
+        `${selectedChunks.length} selected, ${nearMissChunks.length} not selected.`,
+        cutoffGap != null ? `Cutoff gap: ${cutoffGap} (smaller means riskier).` : (nearMissChunks.length === 0 ? 'No rejected candidates to compare against this time — either nothing scored close to the cutoff, or fewer than the top-N candidates existed at all (both are good signs).' : ''),
+        attributionChunks
+          ? 'Selected chunks also show Chunk Attribution — a separate, LLM-judged check of whether the FINAL ANSWER actually drew on that specific chunk (not whether it was merely relevant to the question). ✓ ATTRIBUTED = used, ✗ UNUSED = retrieved but wasted.'
+          : (chunkAttributionError ? `Chunk Attribution unavailable: ${chunkAttributionError}` : ''),
+      ],
+      // Full chunk text, not truncated — a mid-sentence cutoff here would look like a
+      // rendering bug rather than an intentional preview, and there are at most ~10 of these.
+      items: rankedChunks.map(c => {
+        const attrTag = c.attribution
+          ? ` — ${c.attribution.attributed ? '✓ ATTRIBUTED' : '✗ UNUSED'} (utilization ${c.attribution.utilization})`
+          : '';
+        return `${c.selected ? '✓ SELECTED' : '✗ NOT SELECTED'} [${c.source}${c.rerank_score != null ? `, score ${c.rerank_score}` : ''}]${attrTag} ${c.text}`;
+      }),
+    });
 
     // Guardrail ensemble scorers — these run synchronously as part of every chat response
     // (unlike the async ragas/deepeval eval above), so there's no "pending" state: sd is
@@ -885,6 +984,7 @@ function renderTabContent(data) {
       <div class="latency-row" style="margin-top:-12px; margin-bottom: 16px;">
         <div class="lat-chip"><strong>LLM Network:</strong> ${data.llm_latency || 0}ms</div>
         <div class="lat-chip"><strong>Guardrail Engine:</strong> ${data.hm_latency || 0}ms</div>
+        <div class="lat-chip"><strong>Retrieval:</strong> ${retrievalLatency || 0}ms</div>
         <div class="lat-chip"><strong>Model Identifier:</strong> ${escapeHtml(data.model_key || 'llama3-70b-instruct')}</div>
       </div>
 
@@ -918,7 +1018,7 @@ function renderTabContent(data) {
 
       <div class="sp-section" style="padding-bottom:12px;">
         <div class="sp-section-title" style="color:var(--teal);">🔍 Retrieval Quality</div>
-        <div style="font-size:10px; color:var(--muted); margin:-8px 0 12px; line-height:1.4;">Did retrieval find the right chunks for this question? Context Precision / Contextual Relevancy / Hit Rate / MRR are reference-free LLM judgments, not ground-truth-verified — no labeled "correct chunk" dataset exists to check them against.</div>
+        <div style="font-size:10px; color:var(--muted); margin:-8px 0 12px; line-height:1.4;">Did retrieval find the right chunks for this question? Context Precision / Contextual Relevancy / Hit Rate / MRR are reference-free LLM judgments, not ground-truth-verified — no labeled "correct chunk" dataset exists to check them against. Retrieval Cutoff Transparency below is different again — not LLM-judged at all, just showing what the reranker scored but didn't keep.</div>
         <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; font-size:12px;">
           <div class="metric-tile">
             <div style="color:var(--amber); font-weight:700; margin-bottom:4px;">Query-Context Similarity</div>
@@ -952,6 +1052,27 @@ function renderTabContent(data) {
             <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">How high up the retrieved list was the first relevant chunk? For compound "X and Y" questions, rank reflects retrieval-batch order (sub-queries concatenated), not one unified ranking.</div>
             <div style="font-size:9px; color:var(--muted); margin-top:4px; opacity:0.75;">(LLM-judged proxy — no labeled dataset)</div>
             ${mrrHow}
+          </div>
+          <div class="metric-tile">
+            <div style="color:var(--mint); font-weight:700; margin-bottom:4px;">Chunk Diversity</div>
+            <div style="font-size:18px; font-weight:800; color:var(--mint);">${chunkDiversity != null ? chunkDiversity : '—'}</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">Are the selected chunks genuinely different pieces of information, or near-duplicates padding the context?</div>
+            <div style="font-size:9px; color:var(--muted); margin-top:4px; opacity:0.75;">(Instant local embedding signal — not LLM-judged)</div>
+            ${chunkDiversityHow}
+          </div>
+          <div class="metric-tile">
+            <div style="color:var(--teal); font-weight:700; margin-bottom:4px;">Source Coverage</div>
+            <div style="font-size:18px; font-weight:800; color:var(--teal);">${sourceCoverage ? `${sourceCoverage.distinct_sources} doc${sourceCoverage.distinct_sources === 1 ? '' : 's'}` : '—'}</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">How many distinct source documents did the selected chunks actually come from?</div>
+            <div style="font-size:9px; color:var(--muted); margin-top:4px; opacity:0.75;">(Instant count — not LLM-judged)</div>
+            ${sourceCoverageHow}
+          </div>
+          <div class="metric-tile" style="grid-column: span 2;">
+            <div style="color:var(--amber); font-weight:700; margin-bottom:4px;">Retrieval Cutoff Transparency</div>
+            <div style="font-size:18px; font-weight:800; color:var(--amber);">${selectedChunks.length} selected · ${nearMissChunks.length} not selected</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; font-style:italic; line-height:1.4;">Every chunk the reranker actually scored, ranked by score — which ones made the final selection sent to the LLM, and which didn't.${cutoffGap != null ? ` Cutoff gap: ${cutoffGap}.` : ''}</div>
+            <div style="font-size:9px; color:var(--muted); margin-top:4px; opacity:0.75;">(Not LLM-judged — no relevance label exists for these, just the reranker's own score)</div>
+            ${nearMissHow}
           </div>
         </div>
       </div>
@@ -1006,11 +1127,13 @@ function renderTabContent(data) {
     } else {
       cachedIndexedFiles.forEach(file => {
         libHtml += `
-          <div class="doc-list-item">
+          <div class="doc-list-item" style="flex-direction:column; align-items:stretch; gap:6px;">
             <div class="doc-info-block">
               <div class="doc-name-text">📄 ${escapeHtml(file.filename)}</div>
               <div class="doc-meta-text">Sync Type: <strong>Disk Persistent Cloned</strong> · Status: <span style="color:var(--mint); font-weight:600;">Indexed ✓</span></div>
             </div>
+            <button class="sbar-detail-toggle" data-filename="${escapeHtml(file.filename)}" onclick="toggleChunkQualityPanel(this)">▶ Chunking Quality</button>
+            <div class="sbar-extra"></div>
           </div>`;
       });
     }
@@ -1018,7 +1141,7 @@ function renderTabContent(data) {
     contentBody.innerHTML = libHtml;
   }
 }
-function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'); }
+function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, '<br>'); }
 
 applyTheme(document.documentElement.getAttribute('data-theme'));
 refreshActiveTray();

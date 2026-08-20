@@ -60,6 +60,15 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("hm-eval-service")
 
+# Reads LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_BASE_URL from the environment
+# (already loaded above via load_dotenv from the same root .env server.js uses). This
+# process's spans are NOT linked to the Node side's "chat-turn" trace (no W3C traceparent
+# propagation across the HTTP call from server.js — deferred, see the Langfuse plan) — each
+# /evaluate call becomes its own standalone trace in Langfuse, not nested under the
+# originating chat turn. Acceptable for now; revisit if cross-service trace linking is added.
+from langfuse import get_client
+langfuse = get_client()
+
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_JUDGE_MODEL = os.environ.get("OLLAMA_JUDGE_MODEL", "llama3.1")
 OLLAMA_EMBED_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
@@ -417,6 +426,71 @@ def run_masking_check(masked_answer: str, provider: str = "claude"):
     }
 
 
+# ── Chunk Attribution / Utilization (GEval) ───────────────────────────────────────
+# Contextual Relevancy (above, in run_deepeval) judges each chunk against the QUESTION —
+# "is this chunk topically relevant to what was asked." That says nothing about whether
+# the chunk actually influenced the ANSWER: a chunk can be topically on-target and still
+# go completely unused if a different retrieved chunk happened to supply the actual
+# content the model wrote from. This judges chunk vs. ANSWER specifically, separating
+# "retrieved and used" from "retrieved but wasted" — the gap neither Contextual Relevancy
+# nor Faithfulness (answer vs. the whole merged context, not per-chunk) currently covers.
+_chunk_attribution_criteria = (
+    "The CONTEXT below is ONE individual retrieved chunk out of several that were "
+    "available when the RESPONSE was generated. Determine whether the RESPONSE actually "
+    "draws on information contained in THIS SPECIFIC chunk — not just whether the chunk "
+    "is topically related, but whether a fact, figure, or claim in the RESPONSE traces "
+    "back to this chunk's own content. "
+    "SCORING: score how much of THIS chunk's content is reflected in the RESPONSE. "
+    "A score near 1.0 means the response clearly and substantially uses this chunk's "
+    "specific content. A score near 0.0 means the response does not draw on this chunk "
+    "at all — it may have been retrieved (even if topically relevant) but a different "
+    "chunk supplied the actual content used, making this one unused padding. A middle "
+    "score means the response partially reflects this chunk's content."
+)
+
+
+def run_chunk_attribution(answer: str, contexts: list, provider: str = "claude"):
+    """One GEval judgment per retrieved chunk (reference-free, same judge model already
+    used elsewhere in this file) — `contexts` is the same per-chunk list
+    `_split_context_into_chunks` produces, in the same order `server.js` used to build
+    `selected_chunks`, so results are index-aligned back to specific chunks by the caller.
+    Run sequentially (not parallelized) to match every other metric call in this file,
+    which are all synchronous — deepeval's async surface isn't otherwise exercised here,
+    and this call already only runs in the background real-eval pass, not the instant path,
+    so the extra latency of a few sequential chunk judgments is an acceptable tradeoff for
+    not introducing an untested async pattern."""
+    from deepeval.metrics import GEval
+    from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+
+    model = _build_deepeval_model(provider)
+    metric_kwargs = {"threshold": 0.5}
+    if model is not None:
+        metric_kwargs["model"] = model
+
+    per_chunk = []
+    for chunk_text in contexts:
+        metric = GEval(
+            name="Chunk Attribution",
+            criteria=_chunk_attribution_criteria,
+            evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.RETRIEVAL_CONTEXT],
+            **metric_kwargs,
+        )
+        test_case = LLMTestCase(input="(chunk attribution check)", actual_output=answer, retrieval_context=[chunk_text])
+        metric.measure(test_case)
+        per_chunk.append({
+            "attributed": metric.score >= 0.5,
+            "utilization": round(metric.score, 4),
+            "reason": metric.reason,
+        })
+
+    attributed_count = sum(1 for c in per_chunk if c["attributed"])
+    return {
+        "chunks": per_chunk,
+        "attribution_rate": round(attributed_count / len(per_chunk), 4) if per_chunk else None,
+        "avg_utilization": round(sum(c["utilization"] for c in per_chunk) / len(per_chunk), 4) if per_chunk else None,
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -450,7 +524,51 @@ def _is_refusal_text(text: str) -> bool:
     return bool(_REFUSAL_PATTERN.search(text or ""))
 
 
-def _evaluate_with_provider(question: str, answer: str, contexts: list, provider: str, masked_answer: str):
+def _push_scores_to_langfuse(trace_id: str, ragas_scores, deepeval_scores, masking_check, chunk_attribution):
+    """Pushes this project's own already-computed eval numbers into Langfuse as scores on
+    the given trace — pure plumbing, no new computation. Uses `create_score(trace_id=...)`
+    rather than `score_current_trace()` because this runs inside a ThreadPoolExecutor worker
+    thread (see evaluate_turn), where the OTel context that would make "current trace"
+    resolve correctly is not guaranteed to have propagated from the submitting thread —
+    an explicit trace_id sidesteps that entirely. Failures here are logged, never raised —
+    a Langfuse hiccup must not break the actual eval response."""
+    try:
+        if ragas_scores:
+            for key in ("faithfulness", "answer_relevancy", "context_precision"):
+                if ragas_scores.get(key) is not None:
+                    langfuse.create_score(trace_id=trace_id, name=f"ragas_{key}", value=ragas_scores[key], data_type="NUMERIC")
+        if deepeval_scores:
+            for key, reason_key in (
+                ("faithfulness", "faithfulness_reason"),
+                ("hallucination", "hallucination_reason"),
+                ("contextual_relevancy", "contextual_relevancy_reason"),
+                ("hit_rate", "retrieval_rank_reason"),
+                ("mrr", "retrieval_rank_reason"),
+            ):
+                if deepeval_scores.get(key) is not None:
+                    langfuse.create_score(
+                        trace_id=trace_id, name=f"deepeval_{key}", value=deepeval_scores[key],
+                        data_type="NUMERIC", comment=deepeval_scores.get(reason_key),
+                    )
+        if masking_check:
+            langfuse.create_score(
+                trace_id=trace_id, name="masking_check_passed", value=bool(masking_check.get("passed")),
+                data_type="BOOLEAN", comment=masking_check.get("reason"),
+            )
+        if chunk_attribution:
+            chunk_count = len(chunk_attribution.get("chunks") or [])
+            if chunk_attribution.get("attribution_rate") is not None:
+                langfuse.create_score(
+                    trace_id=trace_id, name="chunk_attribution_rate", value=chunk_attribution["attribution_rate"],
+                    data_type="NUMERIC", comment=f"{chunk_count} chunk(s) judged",
+                )
+            if chunk_attribution.get("avg_utilization") is not None:
+                langfuse.create_score(trace_id=trace_id, name="chunk_attribution_avg_utilization", value=chunk_attribution["avg_utilization"], data_type="NUMERIC")
+    except Exception:
+        logger.exception("Failed to push scores to Langfuse (eval response is unaffected)")
+
+
+def _evaluate_with_provider(question: str, answer: str, contexts: list, provider: str, masked_answer: str, trace_id: str = None):
     # A refusal makes zero factual claims, so there is nothing for DeepEval's
     # claim-extraction step to check — and confirmed live that it doesn't handle this
     # gracefully: an earlier identically-shaped refusal scored Hallucination 0% (correct),
@@ -474,6 +592,12 @@ def _evaluate_with_provider(question: str, answer: str, contexts: list, provider
             "retrieval_rank_reason": "Refusal detected — no chunk was used, so none can be ranked relevant.",
         }
         deepeval_error = None
+        chunk_attribution = {
+            "chunks": [{"attributed": False, "utilization": 0.0, "reason": "Refusal detected — no chunk was used."} for _ in contexts],
+            "attribution_rate": 0.0,
+            "avg_utilization": 0.0,
+        }
+        chunk_attribution_error = None
     else:
         try:
             ragas_scores = _sanitize_json(run_ragas(question, answer, contexts, provider))
@@ -491,6 +615,14 @@ def _evaluate_with_provider(question: str, answer: str, contexts: list, provider
             deepeval_scores = None
             deepeval_error = str(e)
 
+        try:
+            chunk_attribution = _sanitize_json(run_chunk_attribution(answer, contexts, provider))
+            chunk_attribution_error = None
+        except Exception as e:
+            logger.exception(f"chunk attribution failed (provider={provider})")
+            chunk_attribution = None
+            chunk_attribution_error = str(e)
+
     try:
         masking_check = _sanitize_json(run_masking_check(masked_answer, provider))
         masking_check_error = None
@@ -499,6 +631,9 @@ def _evaluate_with_provider(question: str, answer: str, contexts: list, provider
         masking_check = None
         masking_check_error = str(e)
 
+    if trace_id:
+        _push_scores_to_langfuse(trace_id, ragas_scores, deepeval_scores, masking_check, chunk_attribution)
+
     return {
         "ragas": ragas_scores,
         "ragas_error": ragas_error,
@@ -506,6 +641,8 @@ def _evaluate_with_provider(question: str, answer: str, contexts: list, provider
         "deepeval_error": deepeval_error,
         "masking_check": masking_check,
         "masking_check_error": masking_check_error,
+        "chunk_attribution": chunk_attribution,
+        "chunk_attribution_error": chunk_attribution_error,
     }
 
 
@@ -543,15 +680,28 @@ def evaluate_turn(req: EvalRequest):
     if unknown:
         logger.warning(f"Ignoring unsupported provider(s) in request: {unknown}")
 
-    # Each provider's own ragas+deepeval calls are already sequential internally;
-    # running the providers themselves in parallel threads is what actually makes
-    # an "ollama" vs "claude" comparison call take roughly as long as either one
-    # alone, instead of the sum of both.
-    futures = {
-        provider: _executor.submit(_evaluate_with_provider, req.question, req.answer, contexts, provider, masked_answer)
-        for provider in providers
-    }
-    per_provider = {provider: future.result() for provider, future in futures.items()}
+    # This span is its own standalone Langfuse trace, NOT nested under the Node side's
+    # "chat-turn" trace — no W3C traceparent propagation across the server.js -> here HTTP
+    # call yet (deferred; see the Langfuse integration plan). trace_id is captured here,
+    # in the main request thread where the span is actually active, then passed explicitly
+    # into each provider's worker thread below rather than relying on those threads to see
+    # this same "current" context (ThreadPoolExecutor workers don't reliably inherit it).
+    with langfuse.start_as_current_observation(
+        name="real-eval", as_type="span",
+        input={"question": req.question, "answer": req.answer, "providers": providers},
+    ) as span:
+        trace_id = langfuse.get_current_trace_id()
+
+        # Each provider's own ragas+deepeval calls are already sequential internally;
+        # running the providers themselves in parallel threads is what actually makes
+        # an "ollama" vs "claude" comparison call take roughly as long as either one
+        # alone, instead of the sum of both.
+        futures = {
+            provider: _executor.submit(_evaluate_with_provider, req.question, req.answer, contexts, provider, masked_answer, trace_id)
+            for provider in providers
+        }
+        per_provider = {provider: future.result() for provider, future in futures.items()}
+        span.update(output={"providers_evaluated": list(per_provider.keys())})
 
     # Keep the original top-level shape (ragas/ragas_error/deepeval/deepeval_error)
     # pointing at the first requested provider, so existing callers reading those

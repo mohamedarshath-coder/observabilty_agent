@@ -22,6 +22,14 @@
 
 const axios = require('axios');
 const https = require('https');
+// Free (non-method) startObservation — picks up whatever Langfuse trace is "active" via
+// OpenTelemetry's async-context propagation at call time (server.js wraps the whole
+// /api/chat handler in startActiveObservation('chat-turn', ...), so these two calls land
+// as child generations of that trace with no explicit parent object threaded through
+// coordinator.js/runGuardrailCheck). If no trace is active (e.g. this module is invoked
+// outside that context), these silently start their own standalone trace instead of
+// throwing — same graceful-degradation posture as the rest of this file.
+const { startObservation } = require('@langfuse/tracing');
 
 const httpsAgent = new https.Agent({ keepAlive: true, rejectUnauthorized: false });
 
@@ -66,20 +74,34 @@ async function callAnthropicJudge(promptArgs) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
   const model = process.env.ANTHROPIC_JUDGE_MODEL || 'claude-sonnet-5';
+  const userPrompt = buildJudgeUserPrompt(promptArgs);
+  const generation = startObservation(
+    'llm-judge-anthropic',
+    { model, input: [{ role: 'system', content: JUDGE_SYSTEM_PROMPT }, { role: 'user', content: userPrompt }] },
+    { asType: 'generation' }
+  );
   try {
     const r = await axios.post('https://api.anthropic.com/v1/messages', {
       model,
       max_tokens: 200,
       system: JUDGE_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: buildJudgeUserPrompt(promptArgs) }],
+      messages: [{ role: 'user', content: userPrompt }],
     }, {
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
       timeout: 60000, httpsAgent,
     });
     const text = (r.data.content || []).map(c => c.text || '').join('');
-    return parseJudgeVerdict(text, 'Anthropic', model);
+    const verdict = parseJudgeVerdict(text, 'Anthropic', model);
+    generation.update({
+      output: text,
+      usageDetails: r.data.usage ? { promptTokens: r.data.usage.input_tokens, completionTokens: r.data.usage.output_tokens } : undefined,
+    });
+    generation.end();
+    return verdict;
   } catch (err) {
     console.error('[LLM Judge — Anthropic Error]:', err.response?.data?.error?.message || err.message);
+    generation.update({ level: 'ERROR', statusMessage: err.message });
+    generation.end();
     return null;
   }
 }
@@ -92,19 +114,36 @@ async function callTogetherJudge(promptArgs) {
   // different serverless (non-dedicated-endpoint) model for more ensemble diversity —
   // check availability at https://api.together.ai/models first.
   const model = process.env.TOGETHER_JUDGE_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+  const messages = [
+    { role: 'system', content: JUDGE_SYSTEM_PROMPT },
+    { role: 'user', content: buildJudgeUserPrompt(promptArgs) },
+  ];
+  const generation = startObservation(
+    'llm-judge-together',
+    { model, input: messages, modelParameters: { temperature: 0, maxTokens: 200 } },
+    { asType: 'generation' }
+  );
   try {
     const r = await axios.post('https://api.together.xyz/v1/chat/completions', {
       model,
-      messages: [
-        { role: 'system', content: JUDGE_SYSTEM_PROMPT },
-        { role: 'user', content: buildJudgeUserPrompt(promptArgs) },
-      ],
+      messages,
       temperature: 0,
       max_tokens: 200,
     }, { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 60000, httpsAgent });
-    return parseJudgeVerdict(r.data.choices?.[0]?.message?.content || '', 'Together', model);
+    const text = r.data.choices?.[0]?.message?.content || '';
+    const verdict = parseJudgeVerdict(text, 'Together', model);
+    generation.update({
+      output: text,
+      usageDetails: r.data.usage ? {
+        promptTokens: r.data.usage.prompt_tokens, completionTokens: r.data.usage.completion_tokens, totalTokens: r.data.usage.total_tokens,
+      } : undefined,
+    });
+    generation.end();
+    return verdict;
   } catch (err) {
     console.error('[LLM Judge — Together Error]:', err.response?.data?.error?.message || err.message);
+    generation.update({ level: 'ERROR', statusMessage: err.message });
+    generation.end();
     return null;
   }
 }
