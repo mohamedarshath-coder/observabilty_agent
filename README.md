@@ -59,6 +59,10 @@ Python eval_service (eval_service/app.py)
 | `PORT` | No (default `3001`) | Node server port |
 | `OPENAI_API_KEY` | No | Optional third LLM-judge provider |
 | `EVAL_SERVICE_URL` | No (default `http://localhost:8500`) | Python eval service address |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | Yes (for tracing) | Langfuse project API key pair — both the Node backend and `eval_service` read these. Get a project's keys from Langfuse under Settings → API Keys. |
+| `LANGFUSE_BASE_URL` | No (default `https://cloud.langfuse.com`) | Langfuse project endpoint (region/self-host URL) |
+| `LANGFUSE_TRACING_ENVIRONMENT` | No (default `default`) | Read by both Langfuse SDKs to tag traces/scores with an environment. Set to `development` for local runs — the deployed app (`app.yaml`) already sets `production`, so local traces don't mix with it in Langfuse's UI. |
+| `MASKING_ENABLED` | No (default `false`) | Turns on the end-user-facing redaction pipeline (financial figures + NER name detection) in `server.js`. **Off by default in this repo right now** — see Known Limitations. Independent of the separate, always-on Langfuse-side masking configured in `instrumentation.js`/`eval_service` (see `LANGFUSE_OBSERVABILITY_REFERENCE.md`). |
 
 > ⚠️ `EMBEDDING_MODEL_PATH` is an absolute filesystem path — it will **not** work if copied from another machine. Update it to match wherever `Sentance_Transformer/` actually lives on your setup.
 
@@ -104,6 +108,7 @@ npx promptfoo@latest view    # visual results in browser
 
 ## Known limitations
 
+- **`MASKING_ENABLED` is off by default** — the end-user-facing redaction pipeline described above is currently disabled in this repo (see the env var table). Set `MASKING_ENABLED=true` to turn it back on. The Langfuse-side masking (`instrumentation.js` / `eval_service`) runs regardless of this flag, but it's a weaker, regex-only subset of the full pipeline (no NER pass) — see `LANGFUSE_OBSERVABILITY_REFERENCE.md` for what that does and doesn't catch.
 - **Masking over-redacts some legitimate business terms** (e.g. "Ad Serving," "Media Partner" can get flagged as if they were person names). Safer-than-not failure direction, not yet tuned.
 - **The "Clear" chat button also wipes the entire document store** (`clearChat()` calls `clearVectorDB()` internally) — this is a real, unpatched bug. Avoid clicking "Clear" if you need to keep your ingested documents; re-upload via `/api/upload` if triggered.
 - **The local/free Ollama evaluation path is disabled by default** — this machine's available RAM was insufficient to run it reliably; the code path still exists in `eval_service/app.py` (`providers: ["ollama"]`) for revisiting on better hardware.

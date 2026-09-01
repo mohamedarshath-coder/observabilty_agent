@@ -22,7 +22,16 @@ const { getDocumentProxy, extractText } = require('unpdf');
 // Local execution engine runtime environment maps
 const { env, pipeline } = require('@xenova/transformers');
 const { runGuardrailCheck } = require('./agents/coordinator');
-const { startObservation, startActiveObservation } = require('@langfuse/tracing');
+const { maskFinancialAndKnownNames } = require('./lib/piiMasking');
+const { startObservation, startActiveObservation, getActiveTraceId, getActiveSpanId, propagateAttributes } = require('@langfuse/tracing');
+const { LangfuseClient } = require('@langfuse/client');
+// Resolves to the exact same module instance the `-r ./instrumentation.js` preload
+// already initialized (same absolute path -> same require cache entry) — this does NOT
+// construct a second NodeSDK/LangfuseSpanProcessor. Only used for its exported `sdk`,
+// so its own shutdown() can be called on SIGTERM below.
+const otelSdk = require('./instrumentation');
+
+const langfuseClient = new LangfuseClient();
 
 const modelFullPath = process.env.EMBEDDING_MODEL_PATH;
 if (!modelFullPath) {
@@ -479,7 +488,7 @@ function extractSourceFilenames(context) {
 // Fire-and-forget: never awaited by the request handler. Populates realEvalStore once
 // the Python service responds, so the client can poll for it after the chat answer
 // has already been returned.
-async function runRealEvalAsync(evalId, { question, answer, context, maskedAnswer }) {
+async function runRealEvalAsync(evalId, { question, answer, context, maskedAnswer, traceId, parentSpanId }) {
   try {
     // Switched primary judge to Claude (cloud) instead of Ollama (local CPU): this
     // machine's available RAM (~1-2GB free) is too tight to run an 8B local model
@@ -493,7 +502,12 @@ async function runRealEvalAsync(evalId, { question, answer, context, maskedAnswe
     // Ollama is left in eval_service's code for whenever hardware allows revisiting
     // the free/local comparison, just not requested live here.
     const r = await axios.post(`${EVAL_SERVICE_URL}/evaluate`,
-      { question, answer, context, providers: ['claude'], masked_answer: maskedAnswer || answer },
+      {
+        question, answer, context, providers: ['claude'], masked_answer: maskedAnswer || answer,
+        // Lets eval_service nest its "real-eval" span under this same chat-turn trace
+        // instead of starting a disconnected one — see eval_service/app.py's evaluate_turn().
+        trace_id: traceId, parent_span_id: parentSpanId,
+      },
       { timeout: 120000 }
     );
     realEvalStore.set(evalId, {
@@ -694,7 +708,12 @@ app.post('/api/chat', async (req, res) => {
   // calls, several files away) automatically nests under this trace via OpenTelemetry's
   // async-context propagation, with zero signature changes needed in the files between
   // here and there.
-  return startActiveObservation('chat-turn', async (rootSpan) => {
+  //
+  // propagateAttributes wraps that so sessionId reaches every observation in the tree too
+  // (v5+ correlating attributes must live on each observation, not just the trace — see
+  // LANGFUSE_OBSERVABILITY_REFERENCE.md). There's no userId: this app has no end-user auth,
+  // so session_id is the only real correlation key available.
+  return propagateAttributes({ sessionId: session_id }, async () => startActiveObservation('chat-turn', async (rootSpan) => {
   // startActiveObservation's 3rd argument only controls context/observation-type options
   // (it has no `input`/`output` fields) — attributes must be set via .update() on the
   // returned span object instead, same as any other observation.
@@ -946,73 +965,20 @@ app.post('/api/chat', async (req, res) => {
 
   if (!networkBlocked) {
    if (MASKING_ENABLED) {
-    // ── 🛡️ MASKING GUARDRAIL 1: FINANCIAL REDACTION LAYER ──
-    const financialCostMaskRegex = /(\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\b\d{1,3}(?:,\d{3})*(?:\.\d{2})?\s*(?:dollars|USD|fee|revenue|cost|payment)\b)/gi;
-    llmResponse = llmResponse.replace(financialCostMaskRegex, "[REDACTED COST/REVENUE Metric]");
-
-    // ── 🛡️ MASKING GUARDRAIL 1b: SPELLED-OUT CURRENCY AMOUNTS ──
-    // The regex above only catches numeral formats ($1,200 / "1200 dollars"). Confirmed
-    // via adversarial testing (Phase 2's GEval masking check) that spelled-out amounts
-    // like "one thousand two hundred dollars" slip through entirely — this catches
-    // runs of number-words immediately followed by a currency word.
-    const numberWord = '(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|and)';
-    const spelledOutCurrencyRegex = new RegExp(`\\b(?:${numberWord}\\s+){1,10}(?:dollars?|USD|cents?)\\b`, 'gi');
-    llmResponse = llmResponse.replace(spelledOutCurrencyRegex, "[REDACTED COST/REVENUE Metric]");
+    // ── 🛡️ MASKING GUARDRAIL 1 & 1b: FINANCIAL REDACTION (numeral + spelled-out) ──
+    // ── 🛡️ MASKING GUARDRAIL 2b: proper-noun known/common-name fallback ──
+    // Both now live in lib/piiMasking.js, shared with the Langfuse export-time mask hooks
+    // (instrumentation.js) so the two enforcement points can't drift apart. Applied here
+    // AFTER the NER pass below so its output also gets the regex fallback layer.
 
     // ── 🛡️ MASKING GUARDRAIL 2: DYNAMIC NER-BASED NAME DETECTION ──
-    // Runs BEFORE the regex/list-based filter below as the primary name-detection layer —
+    // Runs BEFORE the regex/list-based filter as the primary name-detection layer —
     // catches names never seen before (no hardcoded list to keep extending). The regex
     // filter after this still runs as a second layer in case NER misses something or
-    // hasn't finished loading yet for an early request.
+    // hasn't finished loading yet for an early request. NER can't run inside the
+    // synchronous Langfuse mask hook, which is why this step stays server.js-only.
     llmResponse = await maskNamesWithNER(llmResponse);
-
-    // ── 🛡️ MASKING GUARDRAIL 2b: AIRTIGHT PROPER NOUN HUMAN NAME FILTER (fallback layer) ──
-    const corporateExclusions = new Set([
-      'Adobe', 'Inc', 'LatentView', 'Analytics', 'Corporation', 'Business', 'Head', 'Sr', 'Manager',
-      'Corporate', 'Services', 'Strategic', 'Sourcing', 'Director', 'Shared', 'Operations', 'LCM',
-      'EMEA', 'Support', 'Contract', 'Delivery', 'Consultants', 'Work', 'Product', 'Deliverables',
-      'December', 'November', 'February', 'May', 'August', 'Project', 'There', 'However', 'The', 'In'
-    ]);
-
-    // Known place names / landmarks — if any token of a multi-word match is one of these,
-    // treat the whole phrase as a location, not a person, and leave it unmasked.
-    const locationExclusions = new Set([
-      'Eiffel', 'Tower', 'Taj', 'Mahal', 'Golden', 'Gate', 'Great', 'Wall', 'Niagara', 'Falls',
-      'Times', 'Square', 'Central', 'Park', 'Statue', 'Liberty', 'Big', 'Ben', 'Opera', 'House',
-      'New', 'York', 'Delhi', 'Las', 'Vegas', 'Los', 'Angeles', 'San', 'Francisco', 'Hong', 'Kong',
-      'South', 'North', 'United', 'States', 'Kingdom', 'Sri', 'Lanka', 'Saudi', 'Arabia'
-    ]);
-
-    // Common standalone first/last names — redacted even as a single capitalized token
-    // (e.g. a signature line reading just "Kumar"). Extend this list as new names surface.
-    const commonPersonNames = new Set([
-      'Kumar', 'Abhinav', 'Rajesh', 'Suresh', 'Ramesh', 'Priya', 'Anita', 'Vijay', 'Arjun',
-      'Deepak', 'Sanjay', 'Ravi', 'Ajay', 'Vikram', 'Nikhil', 'Rohit', 'Amit', 'Sunil', 'Manoj',
-      'Pankaj', 'Sinha', 'Sharma', 'Gupta', 'Verma', 'Nair', 'Reddy', 'Iyer', 'Menon', 'Pillai', 'Rao'
-    ]);
-
-    const properNounNamePattern = /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g;
-    llmResponse = llmResponse.replace(properNounNamePattern, (matchedName) => {
-      const singleTokens = matchedName.split(/\s+/);
-
-      if (singleTokens.length === 1) {
-        // Lone capitalized word — only redact recognized personal names; leave
-        // place names, months, and generic terms untouched.
-        return commonPersonNames.has(matchedName) ? "[REDACTED PII / NAME Block]" : matchedName;
-      }
-
-      const isCorporateEntity = singleTokens.some(token => corporateExclusions.has(token));
-      const isKnownLocation = singleTokens.some(token => locationExclusions.has(token));
-      // Real human names in this kind of business/technical text are almost always exactly
-      // First + Last (2 tokens). 3+ word Title Case runs are overwhelmingly document/domain
-      // terms (e.g. "Critical Inspection Area", "Die Visual Inspection") — confirmed live:
-      // the LLM expanding the acronym "CIA" into its full term got masked as a name here.
-      // Multi-token PER runs of any length are still caught upstream by the NER layer, which
-      // reasons from the model's own entity understanding rather than a fixed token count —
-      // this fallback only needs to stop guessing on phrases NER didn't flag as a person.
-      if (singleTokens.length >= 3) return matchedName;
-      return (isCorporateEntity || isKnownLocation) ? matchedName : "[REDACTED PII / NAME Block]";
-    });
+    llmResponse = maskFinancialAndKnownNames(llmResponse);
    }
 
     // ── 📚 CITATION FOOTER: append the exact source filenames once, after the full answer ──
@@ -1116,7 +1082,14 @@ app.post('/api/chat', async (req, res) => {
   if (!networkBlocked && !isGuardrailBlocked && context.trim()) {
     realEvalId = `${session_id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     realEvalStore.set(realEvalId, { status: 'pending' });
-    runRealEvalAsync(realEvalId, { question: message, answer: rawLlmResponse, context, maskedAnswer: llmResponse });
+    // Captured synchronously here (still inside rootSpan's active context) rather than
+    // inside runRealEvalAsync itself, so the IDs are correct even though that call is
+    // fire-and-forget and its own async continuation isn't guaranteed to see this
+    // request's active span.
+    runRealEvalAsync(realEvalId, {
+      question: message, answer: rawLlmResponse, context, maskedAnswer: llmResponse,
+      traceId: getActiveTraceId(), parentSpanId: getActiveSpanId(),
+    });
   }
 
   // `networkBlocked` (the LLM call itself failed) and "no context was retrieved, so the
@@ -1141,6 +1114,53 @@ app.post('/api/chat', async (req, res) => {
     ensemble_score = guardrail.ensemble_score || 0.91;
     risk_level = guardrail.risk_level || 'LOW';
     interpretation = 'Financial and PII metrics successfully audited via dynamic rule constraints.';
+  }
+
+  // The 7-scorer guardrail ensemble's own verdict never reached Langfuse before — only
+  // the ragas/deepeval/masking scores from eval_service did (see _push_scores_to_langfuse
+  // there). This is the app's actual safety-gate signal (pass/warn/block), so it belongs
+  // on the trace too. `id` is deterministic (trace-scoped) so a request retry/replay
+  // overwrites rather than double-counts, per the idempotent-score-writes requirement.
+  // score.create() is synchronous/void — it queues internally and flushes on its own
+  // batch timer (same fire-and-forget, fail-open contract as every other Langfuse call
+  // in this file), so it's called directly here, not awaited or chained.
+  //
+  // Gated on !networkBlocked entirely (verdict/ensemble_score included, not just the
+  // per-scorer loop): on a network failure, verdict/ensemble_score are the fixed
+  // 'block'/0.00 placeholders from the branch above ("reflects a system/network failure,
+  // not a content-quality judgment"), not a real guardrail verdict — pushing them would
+  // make every upstream API outage look like the safety gate blocking real content.
+  if (!networkBlocked) {
+    try {
+      langfuseClient.score.create({
+        id: `${rootSpan.traceId}-guardrail-verdict`,
+        traceId: rootSpan.traceId,
+        name: 'guardrail_verdict',
+        value: verdict,
+        dataType: 'CATEGORICAL',
+        comment: interpretation,
+      });
+      langfuseClient.score.create({
+        id: `${rootSpan.traceId}-guardrail-ensemble-score`,
+        traceId: rootSpan.traceId,
+        name: 'guardrail_ensemble_score',
+        value: ensemble_score,
+        dataType: 'NUMERIC',
+      });
+      // Per-scorer confidences (alignedScorers) already power the app's own UI
+      // breakdown — pushed here too so the same breakdown is visible in Langfuse.
+      for (const [scorerName, scorerValue] of Object.entries(alignedScorers)) {
+        langfuseClient.score.create({
+          id: `${rootSpan.traceId}-guardrail-${scorerName}`,
+          traceId: rootSpan.traceId,
+          name: `guardrail_${scorerName}`,
+          value: scorerValue,
+          dataType: 'NUMERIC',
+        });
+      }
+    } catch (err) {
+      console.error('[Langfuse Score Error] guardrail scores:', err.message);
+    }
   }
 
   rootSpan.update({ output: llmResponse });
@@ -1168,7 +1188,7 @@ app.post('/api/chat', async (req, res) => {
     observability: obsTelemetry,
     real_eval_id: realEvalId,
   });
-  });
+  }));
 });
 
 // Client polls this after receiving a chat response to pick up the real ragas/deepeval
@@ -1316,3 +1336,26 @@ app.delete('/api/files', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`\n🛡️ Airtight Masked Observability Core active at http://localhost:${PORT}`));
+
+// app.yaml's shell wrapper traps TERM/INT and forwards the signal to this process
+// (commit d1dfda9), but Node's own default SIGTERM/SIGINT disposition is to exit
+// immediately — with no handler registered, langfuseClient's score queue and the
+// NodeSDK's batched span exporter (instrumentation.js) both still had buffered,
+// unflushed data at that instant, which a redeploy would silently drop. Bounded to 5s
+// (well under Databricks' 15s grace period from the same commit) so a Langfuse outage
+// during shutdown can't itself delay the exit past that window — fail open here too.
+let shuttingDown = false;
+async function flushAndExit(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[Shutdown] ${signal} received — flushing Langfuse before exit...`);
+  const timeout = new Promise(resolve => setTimeout(resolve, 5000));
+  try {
+    await Promise.race([Promise.all([langfuseClient.flush(), otelSdk.shutdown()]), timeout]);
+  } catch (err) {
+    console.error('[Shutdown] Langfuse flush/shutdown error (exiting anyway):', err.message);
+  }
+  process.exit(0);
+}
+process.on('SIGTERM', () => flushAndExit('SIGTERM'));
+process.on('SIGINT', () => flushAndExit('SIGINT'));

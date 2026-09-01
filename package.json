@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@langchain/core": "^1.2.1",
+    "@langfuse/client": "^5.10.1",
     "@langfuse/otel": "^5.10.1",
     "@langfuse/tracing": "^5.10.1",
     "@opentelemetry/sdk-node": "^0.221.0",
