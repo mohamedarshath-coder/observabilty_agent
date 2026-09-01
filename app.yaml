@@ -14,6 +14,12 @@ env:
     valueFrom: langfuse_secret_key
   - name: LANGFUSE_BASE_URL
     value: "https://cloud.langfuse.com"
+  # Read by both the Node and Python Langfuse SDKs (same env var name in both) to tag
+  # every trace/span/score with its environment, so this deployment's data can't get
+  # mixed up with local dev runs in Langfuse's UI/dashboards. Local dev should set this
+  # to "development" in .env (not committed — see LANGFUSE_OBSERVABILITY_REFERENCE.md).
+  - name: LANGFUSE_TRACING_ENVIRONMENT
+    value: "production"
   - name: ANTHROPIC_JUDGE_MODEL
     value: claude-haiku-4-5-20251001
   - name: EVAL_SERVICE_URL

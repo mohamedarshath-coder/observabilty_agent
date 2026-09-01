@@ -16,4 +16,7 @@ python-dotenv>=1.0.0
 # org's Zscaler proxy for large binary downloads. See local_embeddings.py.
 onnxruntime>=1.20.0
 tokenizers>=0.20.0
-langfuse>=3.0.0
+# >=3.0.0 was the actual floor before this repo used mask_otel_spans/MaskOtelSpansParams/
+# OtelSpanPatch (app.py) — those are 4.x-only APIs. Raised to the exact version installed
+# and tested in this project's venv when that code was added.
+langfuse>=4.14.4
